@@ -1,0 +1,19 @@
+:root {
+  --sidebar-bg: #292929;
+  --sidebar-icon: #b3b3b3;
+  --sidebar-active: #6264a7;
+  --panel-bg: #f5f5f5;
+  --panel-border: #e0e0e0;
+  --chat-bg: #ffffff;
+  --msg-sent: #e8ebfa;
+  --msg-sent-border: #6264a7;
+  --msg-received: #f0f0f0;
+  --primary: #6264a7;
+  --primary-dark: #464775;
+  --text-primary: #242424;
+  --text-secondary: #616161;
+  --text-light: #ffffff;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', -apple-system, sans-serif; color: var(--text-primary); }
