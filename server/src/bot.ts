@@ -54,7 +54,8 @@ export async function isGptConversation(conversationId: string): Promise<boolean
   if (!gptBotUserId) return false;
   const convo = await Conversation.findById(conversationId);
   if (!convo) return false;
-  return convo.participants.some(p => p.toString() === gptBotUserId);
+  // Only dedicated 1-on-1 GPT conversation (exactly 2 participants, one is GPT)
+  return convo.participants.length === 2 && convo.participants.some(p => p.toString() === gptBotUserId);
 }
 
 export async function handleGptMessage(conversationId: string, io: any, isMention: boolean = false): Promise<void> {
