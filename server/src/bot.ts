@@ -57,13 +57,24 @@ export async function isGptConversation(conversationId: string): Promise<boolean
   return convo.participants.some(p => p.toString() === gptBotUserId);
 }
 
-export async function handleGptMessage(conversationId: string, io: any): Promise<void> {
+export async function handleGptMessage(conversationId: string, io: any, isMention: boolean = false): Promise<void> {
   if (!gptBotUserId) return;
 
   const { AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT, AZURE_OPENAI_API_VERSION } = process.env;
   if (!AZURE_OPENAI_API_KEY || !AZURE_OPENAI_ENDPOINT || !AZURE_OPENAI_DEPLOYMENT) {
     console.error('Azure OpenAI env vars not set');
     return;
+  }
+
+  // Ensure GPT-5.2 is a participant of this conversation
+  try {
+    const conv = await Conversation.findById(conversationId);
+    if (conv && !conv.participants.some((p: any) => p.toString() === gptBotUserId)) {
+      conv.participants.push(gptBotUserId as any);
+      await conv.save();
+    }
+  } catch (e) {
+    console.error('Failed to add GPT-5.2 to conversation:', e);
   }
 
   // Emit typing
@@ -91,7 +102,7 @@ export async function handleGptMessage(conversationId: string, io: any): Promise
       },
       body: JSON.stringify({
         messages: [
-          { role: 'system', content: '你是 GPT-5.2，一个友好、智能的 AI 助手。请用中文回答用户的问题。保持简洁友好的语气。' },
+          { role: 'system', content: (isMention ? '用户在群聊/对话中 @你，请针对性回复。' : '') + '你是 GPT-5.2，一个友好、智能的 AI 助手。请用中文回答用户的问题。保持简洁友好的语气。' },
           ...history,
         ],
         max_completion_tokens: 1000,

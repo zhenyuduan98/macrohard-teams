@@ -166,6 +166,9 @@ export function setupSocket(io: Server) {
           const isGpt = await isGptConversation(data.conversationId);
           if (isGpt) {
             setTimeout(() => handleGptMessage(data.conversationId, io), 500);
+          } else if (data.content?.includes('@GPT-5.2')) {
+            // @GPT-5.2 mention in any conversation
+            setTimeout(() => handleGptMessage(data.conversationId, io, true), 500);
           }
         }
       } catch (err) {

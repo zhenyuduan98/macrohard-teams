@@ -46,6 +46,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
   const [mentionDropdown, setMentionDropdown] = useState<any[] | null>(null);
   const [mentionFilter, setMentionFilter] = useState('');
   const [mentionStartIdx, setMentionStartIdx] = useState(-1);
+  const [mentionSelectedIdx, setMentionSelectedIdx] = useState(0);
   const [participants, setParticipants] = useState<any[]>([]);
   const [sharedFiles, setSharedFiles] = useState<any[]>([]);
   const [loadingShared, setLoadingShared] = useState(false);
@@ -330,6 +331,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
         const filtered = [{ _id: 'all', username: '所有人' }, ...participants.filter((p: any) => (p._id || p.id) !== currentUserId)]
           .filter(p => p.username.toLowerCase().includes(filter.toLowerCase()));
         setMentionDropdown(filtered.length > 0 ? filtered : null);
+        setMentionSelectedIdx(0);
         return;
       }
     }
@@ -566,10 +568,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
         {streamingContent && (
           <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
             <div style={{ flexShrink: 0, marginTop: 16 }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: '50%', background: '#7c4dff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
-              }}>🤖</div>
+              <img src={imageUrl('/uploads/gpt-avatar.png')} alt="GPT-5.2" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', background: '#fff' }} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', maxWidth: isMobile ? '85%' : '65%' }}>
               <span style={{ fontSize: 12, color: '#7c4dff', marginBottom: 2, marginLeft: 4, fontWeight: 600 }}>GPT-5.2</span>
@@ -659,24 +658,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
         </div>
       )}
 
-      {/* Mention dropdown */}
-      {mentionDropdown && (
-        <div style={{
-          position: 'absolute', bottom: 70, left: 60, zIndex: 1000,
-          background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-          padding: 4, maxHeight: 200, overflowY: 'auto', minWidth: 150,
-        }}>
-          {mentionDropdown.map((u: any) => (
-            <div key={u._id || u.id} onClick={() => selectMention(u)} style={{
-              padding: '8px 12px', cursor: 'pointer', fontSize: 14, borderRadius: 4,
-            }}
-            onMouseOver={e => (e.currentTarget.style.background = '#f0f0f0')}
-            onMouseOut={e => (e.currentTarget.style.background = 'transparent')}>
-              @{u.username}
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Mention dropdown - intentionally empty here, rendered inside input container below */}
 
       {/* File preview */}
       {filePreview && (
@@ -731,7 +713,48 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
       )}
 
       {/* Input */}
-      <div style={{ padding: '12px 20px', borderTop: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ padding: '12px 20px', borderTop: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
+        {/* Mention dropdown anchored above input */}
+        {mentionDropdown && (
+          <div style={{
+            position: 'absolute', bottom: '100%', left: 20, zIndex: 1000,
+            background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            padding: 0, maxHeight: 260, overflowY: 'auto', width: 280, marginBottom: 4,
+          }}>
+            <div style={{ padding: '8px 12px', fontSize: 12, color: '#999', fontWeight: 600, borderBottom: '1px solid #f0f0f0' }}>建议</div>
+            {mentionDropdown.map((u: any, idx: number) => {
+              const isGpt = u.username === 'GPT-5.2';
+              const isSelected = idx === mentionSelectedIdx;
+              return (
+                <div key={u._id || u.id} onClick={() => selectMention(u)} style={{
+                  padding: '8px 12px', cursor: 'pointer', fontSize: 14, borderRadius: 4,
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  background: isSelected ? '#e8ebfa' : 'transparent',
+                }}
+                onMouseEnter={() => setMentionSelectedIdx(idx)}
+                >
+                  {isGpt ? (
+                    <img src={imageUrl('/uploads/gpt-avatar.png')} alt="GPT-5.2" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', background: '#fff', flexShrink: 0 }} />
+                  ) : u._id === 'all' ? (
+                    <div style={{
+                      width: 28, height: 28, borderRadius: '50%', background: '#464775',
+                      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 600, flexShrink: 0,
+                    }}>@</div>
+                  ) : (
+                    <div style={{
+                      width: 28, height: 28, borderRadius: '50%', background: '#6264a7',
+                      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, flexShrink: 0,
+                    }}>{u.username?.[0]?.toUpperCase() || '?'}</div>
+                  )}
+                  <div>
+                    <div style={{ fontWeight: 500 }}>{u.username}</div>
+                    {isGpt && <div style={{ fontSize: 11, color: '#999' }}>AI 助手</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
         <input type="file" ref={fileInputRef} accept="*/*" style={{ display: 'none' }} onChange={handleFileSelect} />
         <button onClick={() => fileInputRef.current?.click()} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 4 }} title="发送图片">📎</button>
         <div style={{ position: 'relative' }} ref={emojiPickerRef}>
@@ -762,7 +785,15 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
           )}
         </div>
         <input value={input} onChange={handleInputChange} ref={inputRef}
-          onKeyDown={e => { if (e.key === 'Enter') { if (selectedImage) { sendImage(); } else { send(); } } }}
+          onKeyDown={e => {
+            if (mentionDropdown) {
+              if (e.key === 'ArrowDown') { e.preventDefault(); setMentionSelectedIdx(i => Math.min(i + 1, mentionDropdown.length - 1)); return; }
+              if (e.key === 'ArrowUp') { e.preventDefault(); setMentionSelectedIdx(i => Math.max(i - 1, 0)); return; }
+              if (e.key === 'Enter') { e.preventDefault(); selectMention(mentionDropdown[mentionSelectedIdx]); return; }
+              if (e.key === 'Escape') { e.preventDefault(); setMentionDropdown(null); return; }
+            }
+            if (e.key === 'Enter') { if (selectedImage) { sendImage(); } else { send(); } }
+          }}
           onPaste={e => {
             const items = e.clipboardData?.items;
             if (!items) return;
