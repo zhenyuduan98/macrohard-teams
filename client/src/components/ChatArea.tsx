@@ -292,7 +292,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
   const getSenderId = (msg: any) => msg.sender?._id || msg.sender?.id || msg.sender;
   const getSenderName = (msg: any) => msg.sender?.username || '';
   const getSenderAvatar = (msg: any) => msg.sender?.avatar || '';
-  const isBot = (msg: any) => getSenderName(msg) === 'MacroBot' || getSenderName(msg) === 'GPT-5.2' || msg.sender?.isBot;
+  const isBot = (msg: any) => getSenderName(msg) === 'MacroBot' || getSenderName(msg) === 'GPT-5.4-mini' || msg.sender?.isBot;
   const formatTime = (ts: string) => new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
@@ -328,9 +328,10 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
       if (!filter.includes(' ')) {
         setMentionStartIdx(atIdx);
         setMentionFilter(filter);
-        const filtered = [{ _id: 'all', username: '所有人' }, ...participants.filter((p: any) => (p._id || p.id) !== currentUserId)]
+        const gptEntry = { _id: 'gpt', username: 'GPT-5.4-mini', isBot: true, avatar: '/uploads/gpt-avatar.png' };
+        const allOptions = [{ _id: 'all', username: '所有人' }, ...participants.filter((p: any) => (p._id || p.id) !== currentUserId), ...(participants.some((p: any) => p.username === 'GPT-5.4-mini') ? [] : [gptEntry])]
           .filter(p => p.username.toLowerCase().includes(filter.toLowerCase()));
-        setMentionDropdown(filtered.length > 0 ? filtered : null);
+        setMentionDropdown(allOptions.length > 0 ? allOptions : null);
         setMentionSelectedIdx(0);
         return;
       }
@@ -386,7 +387,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           {!isGroup && conversation && (() => {
             const other = conversation.participants?.find((p: any) => (p._id || p.id || p) !== currentUserId);
-            const isOtherBot = other?.isBot || other?.username === 'GPT-5.2';
+            const isOtherBot = other?.isBot || other?.username === 'GPT-5.4-mini';
             return !isOtherBot;
           })() && (
             <>
@@ -568,10 +569,10 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
         {streamingContent && (
           <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
             <div style={{ flexShrink: 0, marginTop: 16 }}>
-              <img src={imageUrl('/uploads/gpt-avatar.png')} alt="GPT-5.2" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', background: '#fff' }} />
+              <img src={imageUrl('/uploads/gpt-avatar.png')} alt="GPT-5.4-mini" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', background: '#fff' }} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', maxWidth: isMobile ? '85%' : '65%' }}>
-              <span style={{ fontSize: 12, color: '#7c4dff', marginBottom: 2, marginLeft: 4, fontWeight: 600 }}>GPT-5.2</span>
+              <span style={{ fontSize: 12, color: '#7c4dff', marginBottom: 2, marginLeft: 4, fontWeight: 600 }}>GPT-5.4-mini</span>
               <div style={{
                 padding: '8px 14px', borderRadius: 8,
                 background: '#f3e8ff', borderLeft: '3px solid #7c4dff',
@@ -723,7 +724,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
           }}>
             <div style={{ padding: '8px 12px', fontSize: 12, color: '#999', fontWeight: 600, borderBottom: '1px solid #f0f0f0' }}>建议</div>
             {mentionDropdown.map((u: any, idx: number) => {
-              const isGpt = u.username === 'GPT-5.2';
+              const isGpt = u.username === 'GPT-5.4-mini';
               const isSelected = idx === mentionSelectedIdx;
               return (
                 <div key={u._id || u.id} onClick={() => selectMention(u)} style={{
@@ -734,7 +735,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                 onMouseEnter={() => setMentionSelectedIdx(idx)}
                 >
                   {isGpt ? (
-                    <img src={imageUrl('/uploads/gpt-avatar.png')} alt="GPT-5.2" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', background: '#fff', flexShrink: 0 }} />
+                    <img src={imageUrl('/uploads/gpt-avatar.png')} alt="GPT-5.4-mini" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', background: '#fff', flexShrink: 0 }} />
                   ) : u._id === 'all' ? (
                     <div style={{
                       width: 28, height: 28, borderRadius: '50%', background: '#464775',

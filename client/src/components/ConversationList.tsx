@@ -191,7 +191,7 @@ export default function ConversationList({ selectedId, onSelect, conversations, 
           const lastMsgPreview = lastMsg?.isDeleted ? '消息已撤回' : lastMsg?.type === 'image' ? '🖼️ 图片' : (lastMsg?.content || '开始聊天吧');
           const statusDotColor = !isGroup && otherId ? getStatusColor(otherId) : '#c0c0c0';
           const tooltip = !isGroup && other ? getStatusTooltip(otherId, other.username) : displayName;
-          const isGptBot = !isGroup && (other?.isBot || other?.username === 'GPT-5.2');
+          const isGptBot = !isGroup && (other?.isBot || other?.username === 'GPT-5.4-mini');
 
           return (
             <div key={c._id} onClick={() => onSelect(c._id)} title={tooltip} style={{

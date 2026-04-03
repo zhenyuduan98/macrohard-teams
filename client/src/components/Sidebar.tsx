@@ -11,9 +11,9 @@ const icons = [
   { name: '文件', icon: '📁', key: 'files' },
 ];
 
-interface Props { onLogout: () => void; username: string; avatar?: string; onProfileClick: () => void; activeView?: string; onViewChange?: (view: string) => void; hasUnreadActivity?: boolean; }
+interface Props { onLogout: () => void; username: string; avatar?: string; onProfileClick: () => void; activeView?: string; onViewChange?: (view: string) => void; hasUnreadActivity?: boolean; isAdmin?: boolean; }
 
-export default function Sidebar({ onLogout, username, avatar, onProfileClick, activeView = 'chat', onViewChange, hasUnreadActivity }: Props) {
+export default function Sidebar({ onLogout, username, avatar, onProfileClick, activeView = 'chat', onViewChange, hasUnreadActivity, isAdmin }: Props) {
   const { isDark, toggle } = useTheme();
 
   return (
@@ -34,6 +34,14 @@ export default function Sidebar({ onLogout, username, avatar, onProfileClick, ac
           )}
         </div>
       ))}
+      {isAdmin && (
+        <div title="权限管理" onClick={() => onViewChange?.('admin')} style={{
+          width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: 8, margin: '4px 0', cursor: 'pointer', fontSize: 22,
+          background: activeView === 'admin' ? '#464775' : 'transparent',
+          border: activeView === 'admin' ? '2px solid #6264a7' : '2px solid transparent',
+        }}>🔒</div>
+      )}
       <div style={{ flex: 1 }} />
       <div onClick={onProfileClick} title={username} style={{
         width: 36, height: 36, borderRadius: '50%', overflow: 'hidden',

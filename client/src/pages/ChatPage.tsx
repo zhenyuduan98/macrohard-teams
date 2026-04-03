@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
+import AdminVisibility from '../components/AdminVisibility';
 import Sidebar from '../components/Sidebar';
 import ConversationList from '../components/ConversationList';
 import ChatArea from '../components/ChatArea';
@@ -136,7 +137,7 @@ export default function ChatPage() {
     <div className={isMobile ? 'app-layout mobile-layout' : 'app-layout'} style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       {/* Sidebar - hidden on mobile */}
       {!isMobile && (
-        <Sidebar onLogout={logout} username={user?.username || '?'} avatar={user?.avatar} onProfileClick={() => setShowProfile(true)} activeView={activeView} onViewChange={(v) => { setActiveView(v); if (v === 'activity') setHasUnreadActivity(false); }} hasUnreadActivity={hasUnreadActivity} />
+        <Sidebar onLogout={logout} username={user?.username || '?'} avatar={user?.avatar} onProfileClick={() => setShowProfile(true)} activeView={activeView} onViewChange={(v) => { setActiveView(v); if (v === 'activity') setHasUnreadActivity(false); }} hasUnreadActivity={hasUnreadActivity} isAdmin={user?.username === 'zhenyuduan'} />
       )}
 
       {activeView === 'chat' ? (
@@ -207,6 +208,10 @@ export default function ChatPage() {
       ) : activeView === 'files' ? (
         <div className="mobile-fullscreen-view">
           <FilesHub />
+        </div>
+      ) : activeView === 'admin' ? (
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <AdminVisibility />
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#616161' }}>

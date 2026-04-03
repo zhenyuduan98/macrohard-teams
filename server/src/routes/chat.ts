@@ -1,16 +1,24 @@
 import { Router, Response } from 'express';
 import { User } from '../models/User.js';
 import { Conversation } from '../models/Conversation.js';
+import { ContactVisibility } from '../models/ContactVisibility.js';
 import { Message } from '../models/Message.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { getGptBotUserId } from '../bot.js';
+import { ContactVisibility } from '../models/ContactVisibility.js';
 
 const router = Router();
 
 // List all users (except current)
 router.get('/users', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const users = await User.find({ _id: { $ne: req.userId } }).select('-password');
+    let users = await User.find({ _id: { $ne: req.userId } }).select('-password');
+    // Filter out hidden contacts (bots always visible)
+    const visibility = await ContactVisibility.findOne({ userId: req.userId });
+    if (visibility && visibility.hiddenUsers.length > 0) {
+      const hiddenSet = new Set(visibility.hiddenUsers.map((h: any) => h.toString()));
+      users = users.filter(u => u.isBot || !hiddenSet.has(u._id.toString()));
+    }
     res.json(users.map(u => ({ id: u._id, username: u.username, avatar: u.avatar, status: u.status })));
   } catch {
     res.status(500).json({ error: '获取用户列表失败' });
@@ -20,7 +28,7 @@ router.get('/users', authMiddleware, async (req: AuthRequest, res: Response) => 
 // List user's conversations
 router.get('/conversations', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    // Auto-create GPT-5.2 conversation if not exists
+    // Auto-create GPT-5.4-mini conversation if not exists
     const gptBotId = getGptBotUserId();
     if (gptBotId && req.userId !== gptBotId) {
       const existing = await Conversation.findOne({

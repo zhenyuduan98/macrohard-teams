@@ -160,14 +160,13 @@ export function setupSocket(io: Server) {
           }
         }
 
-        // GPT-5.2 bot response
+        // GPT-5.4-mini bot response — auto-reply in dedicated GPT conversation, @mention in others
         const gptId = getGptBotUserId();
         if (gptId && userId !== gptId) {
           const isGpt = await isGptConversation(data.conversationId);
           if (isGpt) {
             setTimeout(() => handleGptMessage(data.conversationId, io), 500);
-          } else if (data.content?.includes('@GPT-5.2')) {
-            // @GPT-5.2 mention in any conversation
+          } else if (data.content?.includes('@GPT-5.4-mini')) {
             setTimeout(() => handleGptMessage(data.conversationId, io, true), 500);
           }
         }

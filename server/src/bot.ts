@@ -5,7 +5,7 @@ import { Conversation } from './models/Conversation.js';
 
 const BOT_USERNAME = 'MacroBot';
 const BOT_PASSWORD = 'MacroBot!Secret2024';
-const GPT_USERNAME = 'GPT-5.2';
+const GPT_USERNAME = 'GPT-5.4-mini';
 const GPT_PASSWORD = 'GPT52!BotSecret2024!NoLogin';
 
 let botUserId: string | null = null;
@@ -19,7 +19,7 @@ export async function ensureBotUser(): Promise<string> {
   }
   botUserId = bot._id.toString();
 
-  // GPT-5.2 bot
+  // GPT-5.4-mini bot
   const gptBot = await User.findOneAndUpdate(
     { username: GPT_USERNAME },
     {
@@ -37,7 +37,7 @@ export async function ensureBotUser(): Promise<string> {
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
   gptBotUserId = gptBot._id.toString();
-  console.log('GPT-5.2 bot user ready:', gptBotUserId);
+  console.log('GPT-5.4-mini bot user ready:', gptBotUserId);
 
   return botUserId;
 }
@@ -66,7 +66,7 @@ export async function handleGptMessage(conversationId: string, io: any, isMentio
     return;
   }
 
-  // Ensure GPT-5.2 is a participant of this conversation
+  // Ensure GPT-5.4-mini is a participant of this conversation
   try {
     const conv = await Conversation.findById(conversationId);
     if (conv && !conv.participants.some((p: any) => p.toString() === gptBotUserId)) {
@@ -74,7 +74,7 @@ export async function handleGptMessage(conversationId: string, io: any, isMentio
       await conv.save();
     }
   } catch (e) {
-    console.error('Failed to add GPT-5.2 to conversation:', e);
+    console.error('Failed to add GPT-5.4-mini to conversation:', e);
   }
 
   // Emit typing
@@ -102,7 +102,7 @@ export async function handleGptMessage(conversationId: string, io: any, isMentio
       },
       body: JSON.stringify({
         messages: [
-          { role: 'system', content: (isMention ? '用户在群聊/对话中 @你，请针对性回复。' : '') + '你是 GPT-5.2，一个友好、智能的 AI 助手。请用中文回答用户的问题。保持简洁友好的语气。' },
+          { role: 'system', content: (isMention ? '用户在群聊/对话中 @你，请针对性回复。' : '') + '你是 GPT-5.4-mini，一个友好、智能的 AI 助手。请用中文回答用户的问题。保持简洁友好的语气。' },
           ...history,
         ],
         max_completion_tokens: 1000,
