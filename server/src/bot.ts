@@ -1,22 +1,178 @@
+import 'dotenv/config';
 import { User } from './models/User.js';
+import { Message } from './models/Message.js';
+import { Conversation } from './models/Conversation.js';
 
 const BOT_USERNAME = 'MacroBot';
 const BOT_PASSWORD = 'MacroBot!Secret2024';
+const GPT_USERNAME = 'GPT-5.2';
+const GPT_PASSWORD = 'GPT52!BotSecret2024!NoLogin';
 
 let botUserId: string | null = null;
+let gptBotUserId: string | null = null;
 
 export async function ensureBotUser(): Promise<string> {
-  if (botUserId) return botUserId;
+  // MacroBot
   let bot = await User.findOne({ username: BOT_USERNAME });
   if (!bot) {
     bot = await User.create({ username: BOT_USERNAME, password: BOT_PASSWORD, status: 'online' });
   }
   botUserId = bot._id.toString();
+
+  // GPT-5.2 bot
+  const gptBot = await User.findOneAndUpdate(
+    { username: GPT_USERNAME },
+    {
+      $set: {
+        status: 'online',
+        statusType: 'available',
+        isBot: true,
+      },
+      $setOnInsert: {
+        username: GPT_USERNAME,
+        password: GPT_PASSWORD,
+        avatar: '/uploads/gpt-avatar.png',
+      },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+  gptBotUserId = gptBot._id.toString();
+  console.log('GPT-5.2 bot user ready:', gptBotUserId);
+
   return botUserId;
 }
 
 export function getBotUserId(): string | null {
   return botUserId;
+}
+
+export function getGptBotUserId(): string | null {
+  return gptBotUserId;
+}
+
+export async function isGptConversation(conversationId: string): Promise<boolean> {
+  if (!gptBotUserId) return false;
+  const convo = await Conversation.findById(conversationId);
+  if (!convo) return false;
+  return convo.participants.some(p => p.toString() === gptBotUserId);
+}
+
+export async function handleGptMessage(conversationId: string, io: any): Promise<void> {
+  if (!gptBotUserId) return;
+
+  const { AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT, AZURE_OPENAI_API_VERSION } = process.env;
+  if (!AZURE_OPENAI_API_KEY || !AZURE_OPENAI_ENDPOINT || !AZURE_OPENAI_DEPLOYMENT) {
+    console.error('Azure OpenAI env vars not set');
+    return;
+  }
+
+  // Emit typing
+  io.to(conversationId).emit('user_typing', { userId: gptBotUserId, conversationId });
+
+  try {
+    // Fetch last 20 messages for context
+    const recentMsgs = await Message.find({ conversation: conversationId, isDeleted: false })
+      .populate('sender', 'username isBot')
+      .sort({ timestamp: -1 })
+      .limit(20);
+
+    const history = recentMsgs.reverse().map((m: any) => ({
+      role: m.sender?.isBot || m.sender?.username === GPT_USERNAME ? 'assistant' : 'user',
+      content: m.content,
+    }));
+
+    const apiUrl = `${AZURE_OPENAI_ENDPOINT.replace(/\/$/, '')}/openai/deployments/${AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=${AZURE_OPENAI_API_VERSION || '2024-12-01-preview'}`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': AZURE_OPENAI_API_KEY,
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: '你是 GPT-5.2，一个友好、智能的 AI 助手。请用中文回答用户的问题。保持简洁友好的语气。' },
+          ...history,
+        ],
+        max_completion_tokens: 1000,
+        stream: true,
+      }),
+    });
+
+    let replyContent: string;
+    if (!response.ok) {
+      console.error('Azure OpenAI error:', response.status, await response.text().catch(() => ''));
+      replyContent = '抱歉，我暂时无法回复，请稍后再试 😅';
+    } else {
+      // Stream SSE response
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = '';
+      let sseBuffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          sseBuffer += decoder.decode(value, { stream: true });
+          const lines = sseBuffer.split('\n');
+          // Keep last potentially incomplete line in buffer
+          sseBuffer = lines.pop() || '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith('data: ')) continue;
+            const payload = trimmed.slice(6);
+            if (payload === '[DONE]') continue;
+            try {
+              const json = JSON.parse(payload);
+              const token = json.choices?.[0]?.delta?.content || '';
+              if (token) {
+                accumulated += token;
+                io.to(conversationId).emit('gpt_stream_chunk', { conversationId, content: accumulated, done: false });
+              }
+            } catch {}
+          }
+        }
+      } catch (streamErr) {
+        console.error('Stream read error:', streamErr);
+        if (accumulated) {
+          accumulated += '\n\n[回复中断]';
+        }
+      }
+
+      replyContent = accumulated || '抱歉，我暂时无法回复，请稍后再试 😅';
+    }
+
+    // Save and emit reply
+    const botMsg = await Message.create({
+      sender: gptBotUserId,
+      conversation: conversationId,
+      content: replyContent,
+      type: 'text',
+    });
+
+    await Conversation.findByIdAndUpdate(conversationId, {
+      lastMessage: botMsg._id,
+      updatedAt: new Date(),
+    });
+
+    const populated = await botMsg.populate('sender', '-password');
+    io.to(conversationId).emit('gpt_stream_chunk', { conversationId, content: replyContent, done: true, messageId: botMsg._id.toString() });
+    io.to(conversationId).emit('receive_message', populated);
+  } catch (err) {
+    console.error('GPT bot error:', err);
+    // Send error message
+    try {
+      const errMsg = await Message.create({
+        sender: gptBotUserId,
+        conversation: conversationId,
+        content: '抱歉，我暂时无法回复，请稍后再试 😅',
+        type: 'text',
+      });
+      const populated = await errMsg.populate('sender', '-password');
+      io.to(conversationId).emit('receive_message', populated);
+    } catch {}
+  }
 }
 
 const JOKES = [

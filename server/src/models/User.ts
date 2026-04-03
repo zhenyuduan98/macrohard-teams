@@ -8,6 +8,7 @@ export interface IUser {
   status: 'online' | 'offline' | 'away' | 'busy';
   statusText: string;
   statusType: 'available' | 'busy' | 'away' | 'offline';
+  isBot: boolean;
   createdAt: Date;
 }
 
@@ -18,6 +19,7 @@ const userSchema = new mongoose.Schema<IUser>({
   status: { type: String, enum: ['online', 'offline', 'away', 'busy'], default: 'offline' },
   statusText: { type: String, default: '' },
   statusType: { type: String, enum: ['available', 'busy', 'away', 'offline'], default: 'available' },
+  isBot: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
 });
 

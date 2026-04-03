@@ -17,3 +17,76 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', -apple-system, sans-serif; color: var(--text-primary); }
+
+/* Mobile Tab Bar */
+.mobile-tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: var(--bg-sidebar, #292929);
+  border-top: 1px solid var(--panel-border, #e0e0e0);
+  z-index: 1000;
+}
+
+.mobile-tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 4px 12px;
+  color: var(--sidebar-icon, #b3b3b3);
+  transition: color 0.15s;
+}
+
+.mobile-tab-item.active {
+  color: var(--primary, #6264a7);
+}
+
+/* Mobile fullscreen views */
+@media (max-width: 768px) {
+  .mobile-fullscreen-view {
+    flex: 1;
+    width: 100%;
+    height: calc(100vh - 56px);
+    overflow-y: auto;
+  }
+
+  .mobile-layout {
+    flex-direction: column;
+  }
+
+  /* Login page responsive */
+  .login-card {
+    width: 90% !important;
+    max-width: 380px;
+    padding: 24px !important;
+  }
+
+  /* Profile panel full width on mobile */
+  .profile-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Group/team dialogs full screen on mobile */
+  .dialog-overlay .dialog-content {
+    width: 95% !important;
+    max-width: 100% !important;
+    max-height: 90vh !important;
+  }
+
+  /* Message font size */
+  .chat-area-mobile p {
+    font-size: 15px !important;
+  }
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}

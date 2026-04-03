@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import { fetchMessages, uploadImage, uploadFile, fetchGroupMembers } from '../api';
 import ProfileCard from './ProfileCard';
+import { MarkdownMessage } from '../utils/formatMessage';
 import { useCall } from '../contexts/CallContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -19,11 +20,13 @@ interface Props {
   currentUserId: string;
   conversation?: any;
   onStartChat?: (userId: string) => void;
+  isMobile?: boolean;
+  onMobileBack?: () => void;
 }
 
 const chatTabs = ['聊天', '已共享', '组织'];
 
-export default function ChatArea({ conversationId, currentUserId, conversation, onStartChat }: Props) {
+export default function ChatArea({ conversationId, currentUserId, conversation, onStartChat, isMobile, onMobileBack }: Props) {
   const [input, setInput] = useState('');
   const [activeTab, setActiveTab] = useState('聊天');
   const [messages, setMessages] = useState<any[]>([]);
@@ -46,6 +49,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
   const [participants, setParticipants] = useState<any[]>([]);
   const [sharedFiles, setSharedFiles] = useState<any[]>([]);
   const [loadingShared, setLoadingShared] = useState(false);
+  const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const { socket, userStatuses } = useSocket();
   const { startCall, callState } = useCall();
   const { user: authUser } = useAuth();
@@ -127,6 +131,22 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
     };
   }, [socket, conversationId]);
 
+  // GPT streaming listener
+  useEffect(() => {
+    if (!socket || !conversationId) return;
+    const streamHandler = (data: { conversationId: string; content: string; done: boolean }) => {
+      if (data.conversationId === conversationId) {
+        if (data.done) {
+          setStreamingContent(null);
+        } else {
+          setStreamingContent(data.content);
+        }
+      }
+    };
+    socket.on('gpt_stream_chunk', streamHandler);
+    return () => { socket.off('gpt_stream_chunk', streamHandler); };
+  }, [socket, conversationId]);
+
   useEffect(() => {
     if (!socket || !conversationId) return;
     const handler = (data: { userId: string; conversationId: string }) => {
@@ -142,7 +162,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, typingUser]);
+  }, [messages, typingUser, streamingContent]);
 
   if (!conversationId) {
     return (
@@ -271,7 +291,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
   const getSenderId = (msg: any) => msg.sender?._id || msg.sender?.id || msg.sender;
   const getSenderName = (msg: any) => msg.sender?.username || '';
   const getSenderAvatar = (msg: any) => msg.sender?.avatar || '';
-  const isBot = (msg: any) => getSenderName(msg) === 'MacroBot';
+  const isBot = (msg: any) => getSenderName(msg) === 'MacroBot' || getSenderName(msg) === 'GPT-5.2' || msg.sender?.isBot;
   const formatTime = (ts: string) => new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
@@ -343,10 +363,13 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
   const headerSub = isGroup ? `${conversation?.participants?.length || 0} 位成员` : '';
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff' }}>
+    <div className={isMobile ? 'chat-area-mobile' : ''} style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', ...(isMobile ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100 } : {}) }}>
       {/* Header */}
       <div style={{ padding: '12px 20px', borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {isMobile && onMobileBack && (
+            <button onClick={onMobileBack} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '4px 8px', color: '#6264a7', fontWeight: 600 }}>← 返回</button>
+          )}
           <div style={{
             width: 36, height: 36, borderRadius: '50%',
             background: isGroup ? '#464775' : '#6264a7',
@@ -359,7 +382,11 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
           </div>
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          {!isGroup && conversation && (
+          {!isGroup && conversation && (() => {
+            const other = conversation.participants?.find((p: any) => (p._id || p.id || p) !== currentUserId);
+            const isOtherBot = other?.isBot || other?.username === 'GPT-5.2';
+            return !isOtherBot;
+          })() && (
             <>
               <button onClick={() => {
                 const other = conversation.participants?.find((p: any) => (p._id || p.id || p) !== currentUserId);
@@ -383,7 +410,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
               }} title="视频通话">🎥</button>
             </>
           )}
-          {chatTabs.map(t => (
+          {(!isMobile) && chatTabs.map(t => (
             <button key={t} onClick={() => { setActiveTab(t); if (t === '已共享') loadSharedFiles(); }} style={{
               padding: '4px 12px', borderRadius: 4, border: 'none', fontSize: 13, cursor: 'pointer',
               background: activeTab === t ? '#e8ebfa' : 'transparent',
@@ -414,10 +441,14 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
               {!isDeleted && (
                 <div onClick={e => handleAvatarClick(e, msg)} style={{ cursor: 'pointer', flexShrink: 0, marginTop: (isGroup || !isMe) ? 16 : 0 }}>
                   {isBotMsg ? (
-                    <div style={{
-                      width: 32, height: 32, borderRadius: '50%', background: '#7c4dff',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
-                    }}>🤖</div>
+                    senderAvatar ? (
+                      <img src={imageUrl(senderAvatar)} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', background: '#fff' }} />
+                    ) : (
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%', background: '#7c4dff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+                      }}>🤖</div>
+                    )
                   ) : senderAvatar ? (
                     <img src={imageUrl(senderAvatar)} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
                   ) : (
@@ -430,7 +461,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                 </div>
               )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', maxWidth: '65%' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', maxWidth: isMobile ? '85%' : '65%' }}>
                 {/* Sender name */}
                 {(isGroup || !isMe) && !isDeleted && (
                   <span style={{ fontSize: 12, color: isBotMsg ? '#7c4dff' : '#616161', marginBottom: 2, marginLeft: 4, fontWeight: isBotMsg ? 600 : 400 }}>{getSenderName(msg)}</span>
@@ -499,7 +530,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                         <img
                           src={imageUrl(msg.content)}
                           alt="图片"
-                          style={{ maxWidth: 300, maxHeight: 300, borderRadius: 6, cursor: 'pointer', display: 'block' }}
+                          style={{ maxWidth: isMobile ? '70vw' : 300, maxHeight: 300, borderRadius: 6, cursor: 'pointer', display: 'block' }}
                           onClick={() => setLightboxSrc(imageUrl(msg.content))}
                         />
                       ) : msg.type === 'file' ? (
@@ -514,9 +545,13 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                             padding: '4px 10px', fontSize: 12, textDecoration: 'none', cursor: 'pointer',
                           }}>下载</a>
                         </div>
-                      ) : (
-                        <p style={{ fontSize: 14, lineHeight: 1.5, margin: 0 }}>{renderMentions(msg.content)}</p>
-                      )}
+                      ) : isBotMsg ? (
+                          <div style={{ fontSize: 14, lineHeight: 1.5, margin: 0 }}>
+                            <MarkdownMessage content={msg.content} />
+                          </div>
+                        ) : (
+                          <p style={{ fontSize: 14, lineHeight: 1.5, margin: 0 }}>{renderMentions(msg.content)}</p>
+                        )}
                       <span style={{ fontSize: 11, color: '#999', display: 'block', textAlign: 'right', marginTop: 4 }}>
                         {formatTime(msg.timestamp)}
                         {msg.editedAt && <span style={{ marginLeft: 4, fontStyle: 'italic' }}>(已编辑)</span>}
@@ -528,6 +563,27 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
             </div>
           );
         })}
+        {streamingContent && (
+          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+            <div style={{ flexShrink: 0, marginTop: 16 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%', background: '#7c4dff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+              }}>🤖</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', maxWidth: isMobile ? '85%' : '65%' }}>
+              <span style={{ fontSize: 12, color: '#7c4dff', marginBottom: 2, marginLeft: 4, fontWeight: 600 }}>GPT-5.2</span>
+              <div style={{
+                padding: '8px 14px', borderRadius: 8,
+                background: '#f3e8ff', borderLeft: '3px solid #7c4dff',
+              }}>
+                <p style={{ fontSize: 14, lineHeight: 1.5, margin: 0 }}>
+                  <MarkdownMessage content={streamingContent} /><span style={{ animation: 'blink 1s step-end infinite', fontWeight: 700 }}>▌</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         {typingUser && (
           <div style={{ fontSize: 13, color: '#6264a7', fontStyle: 'italic', padding: '4px 0' }}>
             {typingUser} 正在输入...

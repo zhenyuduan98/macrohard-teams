@@ -3,6 +3,7 @@ import { User } from '../models/User.js';
 import { Conversation } from '../models/Conversation.js';
 import { Message } from '../models/Message.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { getGptBotUserId } from '../bot.js';
 
 const router = Router();
 
@@ -19,6 +20,18 @@ router.get('/users', authMiddleware, async (req: AuthRequest, res: Response) => 
 // List user's conversations
 router.get('/conversations', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
+    // Auto-create GPT-5.2 conversation if not exists
+    const gptBotId = getGptBotUserId();
+    if (gptBotId && req.userId !== gptBotId) {
+      const existing = await Conversation.findOne({
+        isGroup: { $ne: true },
+        participants: { $all: [req.userId, gptBotId], $size: 2 },
+      });
+      if (!existing) {
+        await Conversation.create({ participants: [req.userId, gptBotId], isGroup: false });
+      }
+    }
+
     const convos = await Conversation.find({ participants: req.userId })
       .populate('participants', '-password')
       .populate('lastMessage')

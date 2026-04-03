@@ -13,6 +13,7 @@ import ActivityFeed from '../components/ActivityFeed';
 import CalendarView from '../components/CalendarView';
 import CallHistory from '../components/CallHistory';
 import FilesHub from '../components/FilesHub';
+import MobileTabBar from '../components/MobileTabBar';
 import { fetchConversations, createConversation, createGroupConversation } from '../api';
 import { useNotification } from '../hooks/useNotification';
 
@@ -30,9 +31,18 @@ export default function ChatPage() {
   const [channelConvoId, setChannelConvoId] = useState('');
   const [channelHeader, setChannelHeader] = useState({ name: '', teamName: '' });
   const [hasUnreadActivity, setHasUnreadActivity] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
   const { notify } = useNotification();
+
+  // Mobile detection
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   // Update page title with unread count
   useEffect(() => {
@@ -83,6 +93,12 @@ export default function ChatPage() {
     setShowUserList(false);
     setShowGroupCreate(false);
     setUnreadCounts(prev => { const n = { ...prev }; delete n[id]; return n; });
+    if (isMobile) setMobileView('chat');
+  };
+
+  const handleMobileBack = () => {
+    setMobileView('list');
+    setSelectedId('');
   };
 
   const handleStartChat = async (participantId: string) => {
@@ -92,6 +108,7 @@ export default function ChatPage() {
       await loadConversations();
       setSelectedId(convo._id);
       setShowUserList(false);
+      if (isMobile) setMobileView('chat');
     } catch {}
   };
 
@@ -102,64 +119,106 @@ export default function ChatPage() {
       await loadConversations();
       setSelectedId(convo._id);
       setShowGroupCreate(false);
+      if (isMobile) setMobileView('chat');
     } catch {}
   };
 
   const selectedConversation = conversations.find(c => c._id === selectedId);
 
+  // Determine what to show on mobile
+  const showChatView = isMobile && mobileView === 'chat' && (activeView === 'chat' || activeView === 'teams');
+  const showListView = !isMobile || mobileView === 'list' || (!['chat', 'teams'].includes(activeView));
+
+  // For mobile: show bottom tab bar except when in chat view
+  const showMobileTabBar = isMobile && !showChatView;
+
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <Sidebar onLogout={logout} username={user?.username || '?'} avatar={user?.avatar} onProfileClick={() => setShowProfile(true)} activeView={activeView} onViewChange={(v) => { setActiveView(v); if (v === 'activity') setHasUnreadActivity(false); }} hasUnreadActivity={hasUnreadActivity} />
+    <div className={isMobile ? 'app-layout mobile-layout' : 'app-layout'} style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      {/* Sidebar - hidden on mobile */}
+      {!isMobile && (
+        <Sidebar onLogout={logout} username={user?.username || '?'} avatar={user?.avatar} onProfileClick={() => setShowProfile(true)} activeView={activeView} onViewChange={(v) => { setActiveView(v); if (v === 'activity') setHasUnreadActivity(false); }} hasUnreadActivity={hasUnreadActivity} />
+      )}
+
       {activeView === 'chat' ? (
         <>
-          <ConversationList
-            selectedId={selectedId}
-            onSelect={handleSelect}
-            conversations={conversations}
-            onNewChat={() => { setShowUserList(true); setShowGroupCreate(false); }}
-            onNewGroup={() => { setShowGroupCreate(true); setShowUserList(false); }}
-            currentUserId={user?.id || ''}
-            unreadCounts={unreadCounts}
-          />
-          {showUserList ? (
-            <UserList onSelect={handleStartChat} onClose={() => setShowUserList(false)} />
-          ) : (
-            <ChatArea conversationId={selectedId} currentUserId={user?.id || ''} conversation={selectedConversation} onStartChat={handleStartChat} />
+          {/* Conversation list: show on desktop always, on mobile only in list view */}
+          {(!isMobile || mobileView === 'list') && (
+            <ConversationList
+              selectedId={selectedId}
+              onSelect={handleSelect}
+              conversations={conversations}
+              onNewChat={() => { setShowUserList(true); setShowGroupCreate(false); }}
+              onNewGroup={() => { setShowGroupCreate(true); setShowUserList(false); }}
+              currentUserId={user?.id || ''}
+              unreadCounts={unreadCounts}
+              isMobile={isMobile}
+              onProfileClick={() => setShowProfile(true)}
+              username={user?.username || '?'}
+              avatar={user?.avatar}
+              onLogout={logout}
+            />
+          )}
+          {/* Chat area or user list: show on desktop always, on mobile only in chat view */}
+          {(!isMobile || mobileView === 'chat') && (
+            showUserList ? (
+              <UserList onSelect={handleStartChat} onClose={() => setShowUserList(false)} />
+            ) : (
+              <ChatArea conversationId={selectedId} currentUserId={user?.id || ''} conversation={selectedConversation} onStartChat={handleStartChat} isMobile={isMobile} onMobileBack={handleMobileBack} />
+            )
           )}
         </>
       ) : activeView === 'teams' ? (
         <>
-          <TeamList
-            onSelectChannel={(channelId, channelName, teamName) => {
-              setChannelConvoId(channelId);
-              setChannelHeader({ name: channelName, teamName });
-              socket?.emit('join_conversation', { conversationId: channelId });
-            }}
-            onCreateTeam={() => setShowTeamCreate(true)}
-            selectedChannelId={channelConvoId}
-          />
-          <ChatArea
-            conversationId={channelConvoId}
-            currentUserId={user?.id || ''}
-            conversation={{ isGroup: true, name: channelHeader.name ? `${channelHeader.teamName} > #${channelHeader.name}` : '' }}
-            onStartChat={handleStartChat}
-          />
+          {(!isMobile || mobileView === 'list') && (
+            <TeamList
+              onSelectChannel={(channelId, channelName, teamName) => {
+                setChannelConvoId(channelId);
+                setChannelHeader({ name: channelName, teamName });
+                socket?.emit('join_conversation', { conversationId: channelId });
+                if (isMobile) setMobileView('chat');
+              }}
+              onCreateTeam={() => setShowTeamCreate(true)}
+              selectedChannelId={channelConvoId}
+            />
+          )}
+          {(!isMobile || mobileView === 'chat') && (
+            <ChatArea
+              conversationId={channelConvoId}
+              currentUserId={user?.id || ''}
+              conversation={{ isGroup: true, name: channelHeader.name ? `${channelHeader.teamName} > #${channelHeader.name}` : '' }}
+              onStartChat={handleStartChat}
+              isMobile={isMobile}
+              onMobileBack={handleMobileBack}
+            />
+          )}
         </>
       ) : activeView === 'activity' ? (
-        <ActivityFeed onNavigate={(convoId) => { setActiveView('chat'); handleSelect(convoId); }} />
+        <div className="mobile-fullscreen-view">
+          <ActivityFeed onNavigate={(convoId) => { setActiveView('chat'); handleSelect(convoId); }} />
+        </div>
       ) : activeView === 'calendar' ? (
-        <CalendarView />
+        <div className="mobile-fullscreen-view">
+          <CalendarView />
+        </div>
       ) : activeView === 'calls' ? (
-        <CallHistory currentUserId={user?.id || ''} onStartCall={(userId) => handleStartChat(userId)} />
+        <div className="mobile-fullscreen-view">
+          <CallHistory currentUserId={user?.id || ''} onStartCall={(userId) => handleStartChat(userId)} />
+        </div>
       ) : activeView === 'files' ? (
-        <FilesHub />
+        <div className="mobile-fullscreen-view">
+          <FilesHub />
+        </div>
       ) : (
-        <>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#616161' }}>
-            🚧 功能开发中...
-          </div>
-        </>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#616161' }}>
+          🚧 功能开发中...
+        </div>
       )}
+
+      {/* Mobile tab bar */}
+      {showMobileTabBar && (
+        <MobileTabBar activeView={activeView} onViewChange={(v) => { setActiveView(v); setMobileView('list'); if (v === 'activity') setHasUnreadActivity(false); }} />
+      )}
+
       {showGroupCreate && (
         <GroupCreateDialog
           onClose={() => setShowGroupCreate(false)}

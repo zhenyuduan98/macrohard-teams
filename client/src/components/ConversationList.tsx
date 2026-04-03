@@ -15,11 +15,16 @@ interface Props {
   onNewGroup: () => void;
   currentUserId: string;
   unreadCounts?: Record<string, number>;
+  isMobile?: boolean;
+  onProfileClick?: () => void;
+  username?: string;
+  avatar?: string;
+  onLogout?: () => void;
 }
 
 const tabs = ['未读', '频道', '聊天', '会议聊天'];
 
-export default function ConversationList({ selectedId, onSelect, conversations, onNewChat, onNewGroup, currentUserId, unreadCounts = {} }: Props) {
+export default function ConversationList({ selectedId, onSelect, conversations, onNewChat, onNewGroup, currentUserId, unreadCounts = {}, isMobile, onProfileClick, username, avatar, onLogout }: Props) {
   const [activeTab, setActiveTab] = useState('聊天');
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
@@ -91,7 +96,21 @@ export default function ConversationList({ selectedId, onSelect, conversations, 
   };
 
   return (
-    <div style={{ width: 320, borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', height: '100vh', flexShrink: 0 }}>
+    <div className={isMobile ? 'conversation-list-mobile' : ''} style={{ width: isMobile ? '100%' : 320, borderRight: isMobile ? 'none' : '1px solid var(--border)', background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', height: isMobile ? 'calc(100vh - 56px)' : '100vh', flexShrink: 0 }}>
+      {/* Mobile header */}
+      {isMobile && (
+        <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)' }}>
+          <div onClick={onProfileClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {avatar ? (
+              <img src={imageUrl(avatar)} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#6264a7', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 600 }}>{username?.[0]?.toUpperCase()}</div>
+            )}
+            <span style={{ fontWeight: 600, fontSize: 16, color: 'var(--text-primary)' }}>聊天</span>
+          </div>
+          {/* Logout button hidden on mobile, shown on desktop sidebar */}
+        </div>
+      )}
       {/* Search */}
       <div style={{ padding: '12px 16px 8px', display: 'flex', gap: 8, alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-input)', borderRadius: 6, padding: '6px 12px', flex: 1 }}>
@@ -172,6 +191,7 @@ export default function ConversationList({ selectedId, onSelect, conversations, 
           const lastMsgPreview = lastMsg?.isDeleted ? '消息已撤回' : lastMsg?.type === 'image' ? '🖼️ 图片' : (lastMsg?.content || '开始聊天吧');
           const statusDotColor = !isGroup && otherId ? getStatusColor(otherId) : '#c0c0c0';
           const tooltip = !isGroup && other ? getStatusTooltip(otherId, other.username) : displayName;
+          const isGptBot = !isGroup && (other?.isBot || other?.username === 'GPT-5.2');
 
           return (
             <div key={c._id} onClick={() => onSelect(c._id)} title={tooltip} style={{
@@ -186,6 +206,16 @@ export default function ConversationList({ selectedId, onSelect, conversations, 
                     color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 18,
                   }}>👥</div>
+                ) : isGptBot ? (
+                  other?.avatar ? (
+                    <img src={imageUrl(other.avatar)} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', background: '#fff' }} />
+                  ) : (
+                    <div style={{
+                      width: 40, height: 40, borderRadius: '50%', background: '#7c4dff',
+                      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 20,
+                    }}>🤖</div>
+                  )
                 ) : (
                   <>
                     {other?.avatar ? (

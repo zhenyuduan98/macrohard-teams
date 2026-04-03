@@ -5,7 +5,7 @@ import { Message } from './models/Message.js';
 import { Conversation } from './models/Conversation.js';
 import { Activity } from './models/Activity.js';
 import { CallLog } from './models/CallLog.js';
-import { getBotUserId, processBotCommand } from './bot.js';
+import { getBotUserId, getGptBotUserId, processBotCommand, isGptConversation, handleGptMessage } from './bot.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'teamchat-dev-secret';
 const onlineUsers = new Map<string, string>();
@@ -157,6 +157,15 @@ export function setupSocket(io: Server) {
                 io.to(data.conversationId).emit('receive_message', botPopulated);
               } catch {}
             }, 500);
+          }
+        }
+
+        // GPT-5.2 bot response
+        const gptId = getGptBotUserId();
+        if (gptId && userId !== gptId) {
+          const isGpt = await isGptConversation(data.conversationId);
+          if (isGpt) {
+            setTimeout(() => handleGptMessage(data.conversationId, io), 500);
           }
         }
       } catch (err) {
