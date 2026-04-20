@@ -149,9 +149,7 @@ export default function ChannelChat({ channelId, channelName, teamName, onStartC
     setInput('');
     const replyToId = replyTo?._id;
     setReplyTo(null);
-    try {
-      await sendChannelMessage(channelId, content, 'text', undefined, replyToId);
-    } catch {}
+    socket.emit('send_channel_message', { channelId, content, type: 'text', replyTo: replyToId });
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,7 +180,7 @@ export default function ChannelChat({ channelId, channelName, teamName, onStartC
     setUploading(true);
     try {
       const result = await uploadFile(selectedFile);
-      await sendChannelMessage(channelId, result.url, 'file', { filename: result.filename, size: result.size, mimeType: result.mimeType });
+      socket?.emit('send_channel_message', { channelId, content: result.url, type: 'file', fileInfo: { filename: result.filename, size: result.size, mimeType: result.mimeType } });
       cancelFile();
     } catch { alert('文件上传失败'); }
     finally { setUploading(false); }
@@ -193,7 +191,7 @@ export default function ChannelChat({ channelId, channelName, teamName, onStartC
     setUploading(true);
     try {
       const url = await uploadImage(selectedImage);
-      await sendChannelMessage(channelId, url, 'image');
+      socket?.emit('send_channel_message', { channelId, content: url, type: 'image' });
       cancelImage();
     } catch { alert('图片上传失败'); }
     finally { setUploading(false); }
