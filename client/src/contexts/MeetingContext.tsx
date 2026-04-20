@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
-import { useMultiWebRTC, PeerStream } from '../hooks/useMultiWebRTC';
+import { useMultiWebRTC } from '../hooks/useMultiWebRTC';
+import type { PeerStream } from '../hooks/useMultiWebRTC';
 import axios from 'axios';
 import { API_BASE as API } from '../utils/config';
 
