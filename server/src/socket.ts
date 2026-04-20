@@ -8,6 +8,7 @@ import { Channel } from './models/Channel.js';
 import { Team } from './models/Team.js';
 import { Activity } from './models/Activity.js';
 import { CallLog } from './models/CallLog.js';
+import { Meeting } from './models/Meeting.js';
 import { getBotUserId, getGptBotUserId, getOpusBotUserId, processBotCommand, isGptConversation, handleGptMessage, isOpusConversation, handleOpusMessage } from './bot.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'teamchat-dev-secret';
@@ -503,6 +504,157 @@ export function setupSocket(io: Server) {
     // Typing in channel
     socket.on('channel_typing', (data: { channelId: string }) => {
       socket.to(`channel:${data.channelId}`).emit('channel_user_typing', { userId, channelId: data.channelId });
+    });
+
+    // ========================
+    // 多人视频会议 Socket 事件 (WebRTC Mesh)
+    // ========================
+
+    // Join meeting room
+    socket.on('meeting_join', async (data: { meetingId: string }, ack?: Function) => {
+      try {
+        const meeting = await Meeting.findById(data.meetingId);
+        if (!meeting || meeting.status === 'ended') {
+          if (ack) ack({ success: false, error: '会议不存在或已结束' }); return;
+        }
+
+        socket.join(`meeting:${data.meetingId}`);
+
+        // Get other participants already in the room
+        const room = io.sockets.adapter.rooms.get(`meeting:${data.meetingId}`);
+        const existingSocketIds = room ? Array.from(room).filter(id => id !== socket.id) : [];
+
+        // Map socket ids to user ids
+        const existingUsers: string[] = [];
+        for (const sid of existingSocketIds) {
+          const s = io.sockets.sockets.get(sid);
+          if (s) existingUsers.push((s as any).userId);
+        }
+
+        // Notify existing participants about new joiner
+        socket.to(`meeting:${data.meetingId}`).emit('meeting_participant_joined', {
+          meetingId: data.meetingId,
+          userId,
+          socketId: socket.id,
+        });
+
+        // Tell the new joiner about existing participants (so they can create offers)
+        if (ack) ack({
+          success: true,
+          existingParticipants: existingUsers.map(uid => ({ userId: uid })),
+        });
+      } catch {
+        if (ack) ack({ success: false, error: '加入会议房间失败' });
+      }
+    });
+
+    // Leave meeting room
+    socket.on('meeting_leave', (data: { meetingId: string }) => {
+      socket.leave(`meeting:${data.meetingId}`);
+      socket.to(`meeting:${data.meetingId}`).emit('meeting_participant_left', {
+        meetingId: data.meetingId,
+        userId,
+      });
+    });
+
+    // WebRTC offer (mesh: peer-to-peer between each pair)
+    socket.on('meeting_offer', (data: { meetingId: string; targetUserId: string; offer: any }) => {
+      const targetSocketId = onlineUsers.get(data.targetUserId);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('meeting_offer', {
+          meetingId: data.meetingId,
+          fromUserId: userId,
+          offer: data.offer,
+        });
+      }
+    });
+
+    // WebRTC answer
+    socket.on('meeting_answer', (data: { meetingId: string; targetUserId: string; answer: any }) => {
+      const targetSocketId = onlineUsers.get(data.targetUserId);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('meeting_answer', {
+          meetingId: data.meetingId,
+          fromUserId: userId,
+          answer: data.answer,
+        });
+      }
+    });
+
+    // ICE candidate for meeting
+    socket.on('meeting_ice_candidate', (data: { meetingId: string; targetUserId: string; candidate: any }) => {
+      const targetSocketId = onlineUsers.get(data.targetUserId);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('meeting_ice_candidate', {
+          meetingId: data.meetingId,
+          fromUserId: userId,
+          candidate: data.candidate,
+        });
+      }
+    });
+
+    // Toggle camera/mic status broadcast
+    socket.on('meeting_toggle_camera', (data: { meetingId: string; enabled: boolean }) => {
+      socket.to(`meeting:${data.meetingId}`).emit('meeting_camera_toggled', {
+        userId, enabled: data.enabled,
+      });
+    });
+
+    socket.on('meeting_toggle_mic', (data: { meetingId: string; enabled: boolean }) => {
+      socket.to(`meeting:${data.meetingId}`).emit('meeting_mic_toggled', {
+        userId, enabled: data.enabled,
+      });
+    });
+
+    // Screen share start
+    socket.on('meeting_screen_share_start', async (data: { meetingId: string }, ack?: Function) => {
+      try {
+        const meeting = await Meeting.findById(data.meetingId);
+        if (!meeting) { if (ack) ack({ success: false, error: '会议不存在' }); return; }
+        if (meeting.screenSharer && meeting.screenSharer.toString() !== userId) {
+          if (ack) ack({ success: false, error: '已有人在共享屏幕' }); return;
+        }
+        meeting.screenSharer = userId as any;
+        await meeting.save();
+
+        socket.to(`meeting:${data.meetingId}`).emit('meeting_screen_share_started', {
+          meetingId: data.meetingId,
+          userId,
+        });
+        if (ack) ack({ success: true });
+      } catch {
+        if (ack) ack({ success: false, error: '开启屏幕共享失败' });
+      }
+    });
+
+    // Screen share stop
+    socket.on('meeting_screen_share_stop', async (data: { meetingId: string }) => {
+      try {
+        const meeting = await Meeting.findById(data.meetingId);
+        if (meeting && meeting.screenSharer?.toString() === userId) {
+          meeting.screenSharer = undefined;
+          await meeting.save();
+        }
+      } catch {}
+      socket.to(`meeting:${data.meetingId}`).emit('meeting_screen_share_stopped', {
+        meetingId: data.meetingId,
+        userId,
+      });
+    });
+
+    // End meeting broadcast (host)
+    socket.on('meeting_end', async (data: { meetingId: string }) => {
+      try {
+        const meeting = await Meeting.findById(data.meetingId);
+        if (meeting && meeting.host.toString() === userId) {
+          meeting.status = 'ended';
+          meeting.endedAt = new Date();
+          meeting.participants.forEach(p => { if (!p.leftAt) p.leftAt = new Date(); });
+          meeting.screenSharer = undefined;
+          await meeting.save();
+        }
+      } catch {}
+      io.to(`meeting:${data.meetingId}`).emit('meeting_ended', { meetingId: data.meetingId });
     });
 
     socket.on('disconnect', async () => {

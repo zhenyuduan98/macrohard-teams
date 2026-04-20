@@ -4,8 +4,10 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { CallProvider } from './contexts/CallContext';
+import { MeetingProvider } from './contexts/MeetingContext';
 import CallUI from './components/CallUI';
 import IncomingCallDialog from './components/IncomingCallDialog';
+import MeetingRoom from './components/MeetingRoom';
 import LoginPage from './pages/LoginPage';
 import ChatPage from './pages/ChatPage';
 import './styles/global.css';
@@ -32,9 +34,12 @@ export default function App() {
         <AuthProvider>
           <SocketProvider>
             <CallProvider>
-              <AppRoutes />
-              <CallUI />
-              <IncomingCallDialog />
+              <MeetingProvider>
+                <AppRoutes />
+                <CallUI />
+                <IncomingCallDialog />
+                <MeetingRoom />
+              </MeetingProvider>
             </CallProvider>
           </SocketProvider>
         </AuthProvider>

@@ -14,6 +14,7 @@ import eventRoutes from './routes/events.js';
 import callRoutes from './routes/calls.js';
 import fileRoutes from './routes/files.js';
 import adminRoutes from './routes/admin.js';
+import meetingRoutes from './routes/meetings.js';
 import { setupSocket } from './socket.js';
 import { ensureBotUser } from './bot.js';
 
@@ -46,6 +47,7 @@ app.use('/api', eventRoutes);
 app.use('/api', callRoutes);
 app.use('/api', fileRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/meetings', meetingRoutes);
 
 // File upload endpoint
 app.post('/api/upload', upload.single('file'), (req, res) => {

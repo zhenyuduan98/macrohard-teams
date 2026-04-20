@@ -7,6 +7,7 @@ import { MarkdownMessage } from '../utils/formatMessage';
 import { useCall } from '../contexts/CallContext';
 import { useAuth } from '../contexts/AuthContext';
 import { CallIcon, VideoCallIcon, AttachIcon, EmojiIcon, SendIcon, TeamsIcon, ChatIcon } from './Icons';
+import { useMeeting } from '../contexts/MeetingContext';
 
 const EMOJI_LIST = [
   ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','🤩','😍','🥰','😘'],
@@ -56,6 +57,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
   const { socket, userStatuses } = useSocket();
   const { startCall, callState } = useCall();
   const { user: authUser } = useAuth();
+  const { createMeeting, joinMeeting, meetingState } = useMeeting();
   const bottomRef = useRef<HTMLDivElement>(null);
   const typingTimer = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -433,6 +435,17 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                 padding: '4px 8px', borderRadius: 4, opacity: callState === 'idle' ? 1 : 0.4,
               }} title="视频通话"><VideoCallIcon size={20} /></button>
             </>
+          )}
+          {isGroup && (
+            <button onClick={async () => {
+              if (meetingState !== 'idle') return;
+              const id = await createMeeting(conversation?.name || '群聊会议', undefined, conversationId);
+              if (id) await joinMeeting(id);
+            }} disabled={meetingState !== 'idle'} style={{
+              background: '#6264a7', color: '#fff', border: 'none', borderRadius: 6,
+              padding: '4px 12px', cursor: meetingState === 'idle' ? 'pointer' : 'default', fontSize: 13, fontWeight: 600,
+              opacity: meetingState === 'idle' ? 1 : 0.5,
+            }}>🎥 会议</button>
           )}
           {(!isMobile) && chatTabs.map(t => (
             <button key={t} onClick={() => { setActiveTab(t); if (t === '已共享') loadSharedFiles(); }} style={{

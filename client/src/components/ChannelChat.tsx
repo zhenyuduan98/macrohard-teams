@@ -6,6 +6,7 @@ import ProfileCard from './ProfileCard';
 import { MarkdownMessage } from '../utils/formatMessage';
 import { useAuth } from '../contexts/AuthContext';
 import { AttachIcon, EmojiIcon, SendIcon, TeamsIcon } from './Icons';
+import { useMeeting } from '../contexts/MeetingContext';
 
 const EMOJI_LIST = [
   ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','🤩','😍','🥰','😘'],
@@ -48,6 +49,7 @@ export default function ChannelChat({ channelId, channelName, teamName, onStartC
   const [participants, setParticipants] = useState<any[]>([]);
   const { socket, userStatuses } = useSocket();
   const { user: authUser } = useAuth();
+  const { createMeeting, joinMeeting, meetingState } = useMeeting();
   const currentUserId = authUser?.id || '';
   const bottomRef = useRef<HTMLDivElement>(null);
   const typingTimer = useRef<any>(null);
@@ -294,6 +296,15 @@ export default function ChannelChat({ channelId, channelName, teamName, onStartC
           <span style={{ fontWeight: 600, fontSize: 16 }}>{teamName} &gt; #{channelName}</span>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{participants.length} 位成员</div>
         </div>
+        <button onClick={async () => {
+          if (meetingState !== 'idle') return;
+          const id = await createMeeting(`${teamName} > #${channelName} 会议`, channelId);
+          if (id) await joinMeeting(id);
+        }} disabled={meetingState !== 'idle'} style={{
+          marginLeft: 'auto', background: '#6264a7', color: '#fff', border: 'none', borderRadius: 6,
+          padding: '6px 14px', cursor: meetingState === 'idle' ? 'pointer' : 'default', fontSize: 13, fontWeight: 600,
+          opacity: meetingState === 'idle' ? 1 : 0.5, display: 'flex', alignItems: 'center', gap: 6,
+        }}>🎥 发起会议</button>
       </div>
 
       {/* Messages */}
