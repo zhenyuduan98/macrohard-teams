@@ -234,8 +234,8 @@ export default function ChatPage() {
       )}
       {showTeamCreate && (
         <TeamCreateDialog
-          onClose={() => setShowTeamCreate(false)}
-          onCreate={() => setTeamListKey(k => k + 1)}
+          onClose={() => { setShowTeamCreate(false); setTeamListKey(k => k + 1); }}
+          onCreate={() => {}}
         />
       )}
       {showProfile && <ProfilePanel onClose={() => setShowProfile(false)} />}
