@@ -1,11 +1,19 @@
 import React from 'react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export function MarkdownMessage({ content }: { content: string }) {
   return (
     <div className="markdown-body">
       <Markdown
+        remarkPlugins={[remarkGfm]}
         components={{
+          table: ({children}) => <div style={{overflowX: 'auto', margin: '8px 0'}}><table style={{borderCollapse: 'collapse', width: '100%', fontSize: 14}}>{children}</table></div>,
+          thead: ({children}) => <thead style={{background: 'var(--bg-hover, #f5f5f5)'}}>{children}</thead>,
+          tbody: ({children}) => <tbody>{children}</tbody>,
+          tr: ({children}) => <tr style={{borderBottom: '1px solid var(--border, #e0e0e0)'}}>{children}</tr>,
+          th: ({children}) => <th style={{padding: '8px 12px', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid var(--border, #e0e0e0)', whiteSpace: 'nowrap'}}>{children}</th>,
+          td: ({children}) => <td style={{padding: '8px 12px', borderBottom: '1px solid var(--border, #e0e0e0)'}}>{children}</td>,
           h1: ({children}) => <div style={{fontSize: 20, fontWeight: 700, margin: '16px 0 8px', color: 'var(--text-primary, #1a1a1a)'}}>{children}</div>,
           h2: ({children}) => <div style={{fontSize: 18, fontWeight: 700, margin: '14px 0 6px', color: 'var(--text-primary, #1a1a1a)'}}>{children}</div>,
           h3: ({children}) => <div style={{fontSize: 16, fontWeight: 700, margin: '12px 0 4px', color: 'var(--text-primary, #1a1a1a)'}}>{children}</div>,

@@ -57,8 +57,8 @@ export default function AdminVisibility() {
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Left panel - user list */}
       <div style={{
-        width: 250, minWidth: 200, borderRight: '1px solid var(--border-color, #e0e0e0)',
-        overflowY: 'auto', background: 'var(--bg-secondary, #f5f5f5)',
+        width: 250, minWidth: 200, borderRight: '1px solid var(--border)',
+        overflowY: 'auto', background: 'var(--bg-secondary)',
       }}>
         <div style={{ padding: '16px 12px', fontWeight: 600, fontSize: 16, color: '#6264a7' }}>
           权限管理
@@ -68,7 +68,7 @@ export default function AdminVisibility() {
             display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
             cursor: 'pointer',
             background: selectedUser === u.id ? '#6264a7' : 'transparent',
-            color: selectedUser === u.id ? '#fff' : 'var(--text-primary, #333)',
+            color: selectedUser === u.id ? '#fff' : 'var(--text-primary)',
           }}>
             <div style={{
               width: 32, height: 32, borderRadius: '50%', overflow: 'hidden',
@@ -85,7 +85,7 @@ export default function AdminVisibility() {
       {/* Right panel - visibility checkboxes */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
         {!selectedUser ? (
-          <div style={{ color: '#999', textAlign: 'center', marginTop: 60, fontSize: 15 }}>
+          <div style={{ color: 'var(--text-secondary)', textAlign: 'center', marginTop: 60, fontSize: 15 }}>
             ← 选择一个用户来管理其可见联系人
           </div>
         ) : (
@@ -93,13 +93,13 @@ export default function AdminVisibility() {
             <h3 style={{ margin: '0 0 4px', color: '#6264a7' }}>
               {nonBotUsers.find(u => u.id === selectedUser)?.username} 的可见联系人
             </h3>
-            <p style={{ margin: '0 0 16px', fontSize: 13, color: '#888' }}>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-secondary)' }}>
               取消勾选 = 该用户无法在新建聊天中看到此联系人
             </p>
             {contactsForSelected.map(u => (
               <label key={u.id} style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px',
-                cursor: 'pointer', borderBottom: '1px solid var(--border-color, #eee)',
+                cursor: 'pointer', borderBottom: '1px solid var(--border)',
               }}>
                 <input type="checkbox" checked={!hiddenUsers.has(u.id)} onChange={() => toggleUser(u.id)}
                   style={{ width: 18, height: 18, accentColor: '#6264a7' }} />

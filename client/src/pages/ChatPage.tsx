@@ -148,8 +148,8 @@ export default function ChatPage() {
               selectedId={selectedId}
               onSelect={handleSelect}
               conversations={conversations}
-              onNewChat={() => { setShowUserList(true); setShowGroupCreate(false); }}
-              onNewGroup={() => { setShowGroupCreate(true); setShowUserList(false); }}
+              onNewChat={() => { setShowUserList(true); setShowGroupCreate(false); if (isMobile) setMobileView('chat'); }}
+              onNewGroup={() => { setShowGroupCreate(true); setShowUserList(false); if (isMobile) setMobileView('chat'); }}
               currentUserId={user?.id || ''}
               unreadCounts={unreadCounts}
               isMobile={isMobile}

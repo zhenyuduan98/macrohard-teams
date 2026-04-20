@@ -90,3 +90,40 @@ body { font-family: 'Segoe UI', -apple-system, sans-serif; color: var(--text-pri
 @keyframes blink {
   50% { opacity: 0; }
 }
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid #6264a7;
+  outline-offset: 2px;
+}
+input:focus-visible, button:focus-visible {
+  outline: 2px solid #6264a7;
+  outline-offset: 2px;
+}
+
+/* Transitions */
+button, a, [role="button"] {
+  transition: background-color 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
+}
+
+/* Custom scrollbar — dark mode compatible */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--text-disabled, #bdbdbd);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary, #616161);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-disabled, #bdbdbd) transparent;
+}

@@ -2,6 +2,7 @@ import { imageUrl } from '../utils/config';
 import React, { useState } from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import { searchMessages } from '../api';
+import { SearchIcon, GroupIcon, PlusIcon, TeamsIcon } from './Icons';
 
 const STATUS_COLORS: Record<string, string> = {
   available: '#92c353', busy: '#e53935', away: '#f9a825', offline: '#c0c0c0',
@@ -52,7 +53,7 @@ export default function ConversationList({ selectedId, onSelect, conversations, 
     const parts = text.split(new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
     return parts.map((part, i) =>
       part.toLowerCase() === keyword.toLowerCase()
-        ? <span key={i} style={{ background: '#ffeb3b', padding: '0 1px' }}>{part}</span>
+        ? <span key={i} style={{ background: '#5c5c00', padding: '0 2px', color: '#ffeb3b', borderRadius: 2 }}>{part}</span>
         : part
     );
   };
@@ -114,7 +115,7 @@ export default function ConversationList({ selectedId, onSelect, conversations, 
       {/* Search */}
       <div style={{ padding: '12px 16px 8px', display: 'flex', gap: 8, alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-input)', borderRadius: 6, padding: '6px 12px', flex: 1 }}>
-          <span style={{ marginRight: 8, color: 'var(--text-secondary)' }}>🔍</span>
+          <span style={{ marginRight: 8, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}><SearchIcon size={16} /></span>
           <input placeholder="搜索" value={search} onChange={e => setSearch(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
             style={{ border: 'none', background: 'transparent', outline: 'none', flex: 1, fontSize: 14, color: 'var(--text-primary)' }} />
@@ -124,12 +125,12 @@ export default function ConversationList({ selectedId, onSelect, conversations, 
         </div>
         <button onClick={onNewGroup} title="新建群聊" style={{
           background: '#6264a7', color: '#fff', border: 'none', borderRadius: 6,
-          width: 32, height: 32, cursor: 'pointer', fontSize: 16, fontWeight: 600,
-        }}>👥</button>
+          width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}><GroupIcon size={18} /></button>
         <button onClick={onNewChat} title="新对话" style={{
           background: '#6264a7', color: '#fff', border: 'none', borderRadius: 6,
-          width: 32, height: 32, cursor: 'pointer', fontSize: 18, fontWeight: 600,
-        }}>+</button>
+          width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}><PlusIcon size={18} /></button>
       </div>
       {/* Tabs */}
       <div style={{ display: 'flex', padding: '4px 16px 8px', gap: 4 }}>
@@ -180,10 +181,19 @@ export default function ConversationList({ selectedId, onSelect, conversations, 
             暂无对话，点击 + 开始新聊天
           </div>
         )}
-        {filtered.map(c => {
+        {(() => {
+          const sorted = [...filtered].sort((a, b) => {
+            const aIsOpus = !a.isGroup && a.participants?.some((p: any) => p.username === 'Opus 4.6');
+            const bIsOpus = !b.isGroup && b.participants?.some((p: any) => p.username === 'Opus 4.6');
+            if (aIsOpus && !bIsOpus) return -1;
+            if (!aIsOpus && bIsOpus) return 1;
+            return 0;
+          });
+          return sorted;
+        })().map(c => {
           const isGroup = c.isGroup;
           const other = !isGroup ? getOtherParticipant(c) : null;
-          const otherId = other?._id || other?.id;
+          const otherId = (other?._id || other?.id)?.toString?.() || (other?._id || other?.id);
           const lastMsg = c.lastMessage;
           const displayName = getDisplayName(c);
           const memberCount = isGroup ? c.participants?.length : 0;
@@ -191,7 +201,7 @@ export default function ConversationList({ selectedId, onSelect, conversations, 
           const lastMsgPreview = lastMsg?.isDeleted ? '消息已撤回' : lastMsg?.type === 'image' ? '🖼️ 图片' : (lastMsg?.content || '开始聊天吧');
           const statusDotColor = !isGroup && otherId ? getStatusColor(otherId) : '#c0c0c0';
           const tooltip = !isGroup && other ? getStatusTooltip(otherId, other.username) : displayName;
-          const isGptBot = !isGroup && (other?.isBot || other?.username === 'GPT-5.4-mini');
+          const isGptBot = !isGroup && (other?.isBot || other?.username === 'GPT-5.4-mini' || other?.username === 'Opus 4.6');
 
           return (
             <div key={c._id} onClick={() => onSelect(c._id)} title={tooltip} style={{
@@ -204,8 +214,8 @@ export default function ConversationList({ selectedId, onSelect, conversations, 
                   <div style={{
                     width: 40, height: 40, borderRadius: '50%', background: '#464775',
                     color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 18,
-                  }}>👥</div>
+                    fontSize: 18, display: 'flex',
+                  }}><TeamsIcon size={22} /></div>
                 ) : isGptBot ? (
                   other?.avatar ? (
                     <img src={imageUrl(other.avatar)} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', background: '#fff' }} />
@@ -245,7 +255,7 @@ export default function ConversationList({ selectedId, onSelect, conversations, 
                     <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{formatTime(c.updatedAt)}</span>
                     {unread > 0 && (
                       <span style={{
-                        background: '#e53935', color: '#fff', borderRadius: 10, fontSize: 11,
+                        background: 'var(--danger, #e53935)', color: '#fff', borderRadius: 10, fontSize: 11,
                         fontWeight: 700, padding: '1px 6px', minWidth: 18, textAlign: 'center',
                       }}>{unread > 99 ? '99+' : unread}</span>
                     )}

@@ -6,6 +6,7 @@ import ProfileCard from './ProfileCard';
 import { MarkdownMessage } from '../utils/formatMessage';
 import { useCall } from '../contexts/CallContext';
 import { useAuth } from '../contexts/AuthContext';
+import { CallIcon, VideoCallIcon, AttachIcon, EmojiIcon, SendIcon, TeamsIcon, ChatIcon } from './Icons';
 
 const EMOJI_LIST = [
   ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','🤩','😍','🥰','😘'],
@@ -30,6 +31,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
   const [input, setInput] = useState('');
   const [activeTab, setActiveTab] = useState('聊天');
   const [messages, setMessages] = useState<any[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [typingUser, setTypingUser] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -83,7 +85,8 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
     setMessages([]);
     setReplyTo(null);
     setEditingId(null);
-    fetchMessages(conversationId).then(setMessages).catch(() => {});
+    setLoadingMessages(true);
+    fetchMessages(conversationId).then(setMessages).catch(() => {}).finally(() => setLoadingMessages(false));
     socket?.emit('join_conversation', { conversationId });
   }, [conversationId, socket]);
 
@@ -148,6 +151,22 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
     return () => { socket.off('gpt_stream_chunk', streamHandler); };
   }, [socket, conversationId]);
 
+  // Opus streaming listener
+  useEffect(() => {
+    if (!socket || !conversationId) return;
+    const streamHandler = (data: { conversationId: string; content: string; done: boolean }) => {
+      if (data.conversationId === conversationId) {
+        if (data.done) {
+          setStreamingContent(null);
+        } else {
+          setStreamingContent(data.content);
+        }
+      }
+    };
+    socket.on('opus_stream_chunk', streamHandler);
+    return () => { socket.off('opus_stream_chunk', streamHandler); };
+  }, [socket, conversationId]);
+
   useEffect(() => {
     if (!socket || !conversationId) return;
     const handler = (data: { userId: string; conversationId: string }) => {
@@ -167,8 +186,9 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
 
   if (!conversationId) {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#616161', fontSize: 16 }}>
-        💬 选择一个对话开始聊天
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: 16, background: 'var(--bg-primary)', gap: 8 }}>
+        <ChatIcon size={16} />
+        <span>选择一个对话开始聊天</span>
       </div>
     );
   }
@@ -292,7 +312,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
   const getSenderId = (msg: any) => msg.sender?._id || msg.sender?.id || msg.sender;
   const getSenderName = (msg: any) => msg.sender?.username || '';
   const getSenderAvatar = (msg: any) => msg.sender?.avatar || '';
-  const isBot = (msg: any) => getSenderName(msg) === 'MacroBot' || getSenderName(msg) === 'GPT-5.4-mini' || msg.sender?.isBot;
+  const isBot = (msg: any) => getSenderName(msg) === 'MacroBot' || getSenderName(msg) === 'GPT-5.4-mini' || getSenderName(msg) === 'Opus 4.6' || msg.sender?.isBot;
   const formatTime = (ts: string) => new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
@@ -329,7 +349,8 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
         setMentionStartIdx(atIdx);
         setMentionFilter(filter);
         const gptEntry = { _id: 'gpt', username: 'GPT-5.4-mini', isBot: true, avatar: '/uploads/gpt-avatar.png' };
-        const allOptions = [{ _id: 'all', username: '所有人' }, ...participants.filter((p: any) => (p._id || p.id) !== currentUserId), ...(participants.some((p: any) => p.username === 'GPT-5.4-mini') ? [] : [gptEntry])]
+        const opusEntry = { _id: 'opus', username: 'Opus 4.6', isBot: true, avatar: '/uploads/opus-avatar.png' };
+        const allOptions = [{ _id: 'all', username: '所有人' }, ...participants.filter((p: any) => (p._id || p.id) !== currentUserId), ...(participants.some((p: any) => p.username === 'GPT-5.4-mini') ? [] : [gptEntry]), ...(participants.some((p: any) => p.username === 'Opus 4.6') ? [] : [opusEntry])]
           .filter(p => p.username.toLowerCase().includes(filter.toLowerCase()));
         setMentionDropdown(allOptions.length > 0 ? allOptions : null);
         setMentionSelectedIdx(0);
@@ -366,22 +387,22 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
   const headerSub = isGroup ? `${conversation?.participants?.length || 0} 位成员` : '';
 
   return (
-    <div className={isMobile ? 'chat-area-mobile' : ''} style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', ...(isMobile ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100 } : {}) }}>
+    <div className={isMobile ? 'chat-area-mobile' : ''} style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', ...(isMobile ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100 } : {}) }}>
       {/* Header */}
-      <div style={{ padding: '12px 20px', borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-primary)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {isMobile && onMobileBack && (
-            <button onClick={onMobileBack} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '4px 8px', color: '#6264a7', fontWeight: 600 }}>← 返回</button>
+            <button onClick={onMobileBack} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '4px 8px', color: '#6264a7', fontWeight: 600 }}>返回</button>
           )}
           <div style={{
             width: 36, height: 36, borderRadius: '50%',
             background: isGroup ? '#464775' : '#6264a7',
             color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600,
             fontSize: isGroup ? 18 : 16,
-          }}>{isGroup ? '👥' : '💬'}</div>
+          }}>{isGroup ? <TeamsIcon size={20} /> : <ChatIcon size={20} />}</div>
           <div>
             <span style={{ fontWeight: 600, fontSize: 16 }}>{headerTitle}</span>
-            {headerSub && <div style={{ fontSize: 12, color: '#616161' }}>{headerSub}</div>}
+            {headerSub && <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{headerSub}</div>}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -400,7 +421,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
               }} disabled={callState !== 'idle'} style={{
                 background: 'none', border: 'none', fontSize: 20, cursor: callState === 'idle' ? 'pointer' : 'default',
                 padding: '4px 8px', borderRadius: 4, opacity: callState === 'idle' ? 1 : 0.4,
-              }} title="语音通话">📞</button>
+              }} title="语音通话"><CallIcon size={20} /></button>
               <button onClick={() => {
                 const other = conversation.participants?.find((p: any) => (p._id || p.id || p) !== currentUserId);
                 if (!other || callState !== 'idle') return;
@@ -410,14 +431,14 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
               }} disabled={callState !== 'idle'} style={{
                 background: 'none', border: 'none', fontSize: 20, cursor: callState === 'idle' ? 'pointer' : 'default',
                 padding: '4px 8px', borderRadius: 4, opacity: callState === 'idle' ? 1 : 0.4,
-              }} title="视频通话">🎥</button>
+              }} title="视频通话"><VideoCallIcon size={20} /></button>
             </>
           )}
           {(!isMobile) && chatTabs.map(t => (
             <button key={t} onClick={() => { setActiveTab(t); if (t === '已共享') loadSharedFiles(); }} style={{
               padding: '4px 12px', borderRadius: 4, border: 'none', fontSize: 13, cursor: 'pointer',
-              background: activeTab === t ? '#e8ebfa' : 'transparent',
-              color: activeTab === t ? '#6264a7' : '#616161', fontWeight: activeTab === t ? 600 : 400,
+              background: activeTab === t ? 'var(--msg-sent)' : 'transparent',
+              color: activeTab === t ? '#6264a7' : 'var(--text-secondary)', fontWeight: activeTab === t ? 600 : 400,
             }}>{t}</button>
           ))}
         </div>
@@ -425,6 +446,9 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {loadingMessages && messages.length === 0 && (
+          <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 40, fontSize: 14 }}>加载中...</div>
+        )}
         {messages.map(msg => {
           const isMe = getSenderId(msg) === currentUserId;
           const isImage = msg.type === 'image';
@@ -467,15 +491,15 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', maxWidth: isMobile ? '85%' : '65%' }}>
                 {/* Sender name */}
                 {(isGroup || !isMe) && !isDeleted && (
-                  <span style={{ fontSize: 12, color: isBotMsg ? '#7c4dff' : '#616161', marginBottom: 2, marginLeft: 4, fontWeight: isBotMsg ? 600 : 400 }}>{getSenderName(msg)}</span>
+                  <span style={{ fontSize: 12, color: isBotMsg ? '#7c4dff' : 'var(--text-secondary)', marginBottom: 2, marginLeft: 4, fontWeight: isBotMsg ? 600 : 400 }}>{getSenderName(msg)}</span>
                 )}
 
                 {/* Reply quote */}
                 {replyMsg && !isDeleted && (
                   <div style={{
                     padding: '4px 10px', borderRadius: '6px 6px 0 0',
-                    background: '#f5f5f5', borderLeft: '3px solid #6264a7',
-                    fontSize: 12, color: '#616161', marginBottom: -2,
+                    background: 'var(--bg-secondary)', borderLeft: '3px solid #6264a7',
+                    fontSize: 12, color: 'var(--text-secondary)', marginBottom: -2,
                   }}>
                     <span style={{ fontWeight: 600 }}>{replyMsg.sender?.username || '用户'}</span>
                     <span style={{ marginLeft: 6 }}>{replyMsg.isDeleted ? '消息已撤回' : (replyMsg.content?.substring(0, 50) || '')}{replyMsg.content?.length > 50 ? '...' : ''}</span>
@@ -486,7 +510,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                 {isDeleted ? (
                   <div style={{
                     padding: '8px 14px', borderRadius: 8,
-                    background: '#f8f8f8', fontStyle: 'italic', color: '#999', fontSize: 13,
+                    background: 'var(--bg-secondary)', fontStyle: 'italic', color: 'var(--text-secondary)', fontSize: 13,
                   }}>
                     消息已撤回
                   </div>
@@ -497,17 +521,17 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                       onChange={e => setEditContent(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
                       autoFocus
-                      style={{ flex: 1, padding: '8px 12px', border: '1px solid #6264a7', borderRadius: 6, fontSize: 14, outline: 'none' }}
+                      style={{ flex: 1, padding: '8px 12px', border: '1px solid #6264a7', borderRadius: 6, fontSize: 14, outline: 'none', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
                     />
                     <button onClick={saveEdit} style={{ background: '#6264a7', color: '#fff', border: 'none', borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 13 }}>保存</button>
-                    <button onClick={cancelEdit} style={{ background: '#e0e0e0', border: 'none', borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 13 }}>取消</button>
+                    <button onClick={cancelEdit} style={{ background: 'var(--border)', border: 'none', borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 13 }}>取消</button>
                   </div>
                 ) : (
                   <div style={{ position: 'relative' }}>
                     {/* Hover actions */}
                     <div className="msg-actions" style={{
                       position: 'absolute', top: -8, right: isMe ? 'auto' : -60, left: isMe ? -60 : 'auto',
-                      display: 'none', gap: 2, background: '#fff', borderRadius: 4, boxShadow: '0 1px 4px rgba(0,0,0,0.15)', padding: 2,
+                      display: 'none', gap: 2, background: 'var(--bg-card)', borderRadius: 4, boxShadow: '0 1px 4px var(--shadow)', padding: 2,
                     }}>
                       <button onClick={() => handleReply(msg)} title="回复" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}>↩️</button>
                       {isMe && canEdit(msg) && <button onClick={() => startEdit(msg)} title="编辑" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}>✏️</button>}
@@ -516,8 +540,8 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                     <div
                       style={{
                         padding: '8px 14px', borderRadius: 8,
-                        background: isBotMsg ? '#f3e8ff' : isMe ? '#e8ebfa' : '#f0f0f0',
-                        borderLeft: isBotMsg ? '3px solid #7c4dff' : isMe ? 'none' : '3px solid #d0d0d0',
+                        background: isBotMsg ? 'var(--msg-bot)' : isMe ? 'var(--msg-sent)' : 'var(--msg-received)',
+                        borderLeft: isBotMsg ? '3px solid var(--msg-bot-border)' : isMe ? 'none' : '3px solid var(--border)',
                         borderRight: isMe && !isBotMsg ? '3px solid #6264a7' : 'none',
                       }}
                       onMouseEnter={e => {
@@ -541,7 +565,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                           <span style={{ fontSize: 28 }}>{getFileIcon(msg.fileInfo?.mimeType)}</span>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg.fileInfo?.filename || '文件'}</div>
-                            <div style={{ fontSize: 12, color: '#999' }}>{formatFileSize(msg.fileInfo?.size || 0)}</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{formatFileSize(msg.fileInfo?.size || 0)}</div>
                           </div>
                           <a href={imageUrl(msg.content)} download={msg.fileInfo?.filename} style={{
                             background: '#6264a7', color: '#fff', border: 'none', borderRadius: 4,
@@ -551,11 +575,25 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                       ) : isBotMsg ? (
                           <div style={{ fontSize: 14, lineHeight: 1.5, margin: 0 }}>
                             <MarkdownMessage content={msg.content} />
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(msg.content).then(() => {
+                                  const btn = document.getElementById(`copy-btn-${msg._id}`);
+                                  if (btn) { btn.textContent = '✅ 已复制'; setTimeout(() => { btn.textContent = '📋 复制'; }, 1500); }
+                                });
+                              }}
+                              id={`copy-btn-${msg._id}`}
+                              style={{
+                                background: 'var(--bg-hover, #f0f0f0)', border: '1px solid var(--border, #e0e0e0)',
+                                borderRadius: 4, padding: '3px 10px', fontSize: 12, cursor: 'pointer',
+                                color: 'var(--text-secondary)', marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 4,
+                              }}
+                            >📋 复制</button>
                           </div>
                         ) : (
                           <p style={{ fontSize: 14, lineHeight: 1.5, margin: 0 }}>{renderMentions(msg.content)}</p>
                         )}
-                      <span style={{ fontSize: 11, color: '#999', display: 'block', textAlign: 'right', marginTop: 4 }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', textAlign: 'right', marginTop: 4 }}>
                         {formatTime(msg.timestamp)}
                         {msg.editedAt && <span style={{ marginLeft: 4, fontStyle: 'italic' }}>(已编辑)</span>}
                       </span>
@@ -575,7 +613,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
               <span style={{ fontSize: 12, color: '#7c4dff', marginBottom: 2, marginLeft: 4, fontWeight: 600 }}>GPT-5.4-mini</span>
               <div style={{
                 padding: '8px 14px', borderRadius: 8,
-                background: '#f3e8ff', borderLeft: '3px solid #7c4dff',
+                background: 'var(--msg-bot)', borderLeft: '3px solid var(--msg-bot-border)',
               }}>
                 <p style={{ fontSize: 14, lineHeight: 1.5, margin: 0 }}>
                   <MarkdownMessage content={streamingContent} /><span style={{ animation: 'blink 1s step-end infinite', fontWeight: 700 }}>▌</span>
@@ -606,11 +644,11 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
       {contextMenu && (
         <div style={{
           position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 10000,
-          background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+          background: 'var(--bg-card)', borderRadius: 8, boxShadow: '0 4px 16px var(--shadow)',
           padding: 4, minWidth: 120,
         }}>
           <div onClick={() => handleReply(contextMenu.msg)} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 14, borderRadius: 4 }}
-            onMouseOver={e => (e.currentTarget.style.background = '#f0f0f0')}
+            onMouseOver={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
             onMouseOut={e => (e.currentTarget.style.background = 'transparent')}>
             ↩️ 回复
           </div>
@@ -618,13 +656,13 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
             <>
               {canEdit(contextMenu.msg) && (
                 <div onClick={() => startEdit(contextMenu.msg)} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 14, borderRadius: 4 }}
-                  onMouseOver={e => (e.currentTarget.style.background = '#f0f0f0')}
+                  onMouseOver={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                   onMouseOut={e => (e.currentTarget.style.background = 'transparent')}>
                   ✏️ 编辑
                 </div>
               )}
               <div onClick={() => handleDelete(contextMenu.msg)} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 14, borderRadius: 4, color: '#e53935' }}
-                onMouseOver={e => (e.currentTarget.style.background = '#fff0f0')}
+                onMouseOver={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                 onMouseOut={e => (e.currentTarget.style.background = 'transparent')}>
                 🗑️ 撤回
               </div>
@@ -635,11 +673,11 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
 
       {/* Shared files tab */}
       {activeTab === '已共享' && (
-        <div style={{ position: 'absolute', top: 52, left: 0, right: 0, bottom: 0, background: '#fff', zIndex: 10, overflowY: 'auto', padding: 16 }}>
-          {loadingShared ? <div style={{ textAlign: 'center', color: '#999', padding: 20 }}>加载中...</div> : sharedFiles.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#999', padding: 20 }}>暂无共享文件</div>
+        <div style={{ position: 'absolute', top: 52, left: 0, right: 0, bottom: 0, background: 'var(--bg-primary)', zIndex: 10, overflowY: 'auto', padding: 16 }}>
+          {loadingShared ? <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 20 }}>加载中...</div> : sharedFiles.length === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 20 }}>暂无共享文件</div>
           ) : sharedFiles.map((msg: any) => (
-            <div key={msg._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+            <div key={msg._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--bg-hover)' }}>
               {msg.type === 'image' ? (
                 <img src={imageUrl(msg.content)} alt="" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover' }} />
               ) : (
@@ -649,7 +687,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                 <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {msg.type === 'image' ? '🖼️ 图片' : (msg.fileInfo?.filename || '文件')}
                 </div>
-                <div style={{ fontSize: 11, color: '#999' }}>{getSenderName(msg)} · {formatTime(msg.timestamp)}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{getSenderName(msg)} · {formatTime(msg.timestamp)}</div>
               </div>
               <a href={imageUrl(msg.content)} download={msg.fileInfo?.filename || true} style={{
                 color: '#6264a7', fontSize: 12, textDecoration: 'none',
@@ -663,13 +701,13 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
 
       {/* File preview */}
       {filePreview && (
-        <div style={{ padding: '8px 20px', borderTop: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 8, background: '#fafafa' }}>
+        <div style={{ padding: '8px 20px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-tertiary)' }}>
           <span style={{ fontSize: 28 }}>📄</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 500 }}>{filePreview.name}</div>
-            <div style={{ fontSize: 11, color: '#999' }}>{formatFileSize(filePreview.size)}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{formatFileSize(filePreview.size)}</div>
           </div>
-          <button onClick={cancelFile} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#999' }}>✕</button>
+          <button onClick={cancelFile} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--text-secondary)' }}>✕</button>
           <button onClick={sendFile} disabled={uploading} style={{
             background: '#6264a7', color: '#fff', border: 'none', borderRadius: 6,
             padding: '6px 14px', cursor: uploading ? 'default' : 'pointer', fontSize: 13, fontWeight: 600,
@@ -681,27 +719,27 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
       {/* Reply preview */}
       {replyTo && (
         <div style={{
-          padding: '8px 20px', borderTop: '1px solid #e0e0e0', background: '#f8f8ff',
+          padding: '8px 20px', borderTop: '1px solid var(--border)', background: 'var(--bg-secondary)',
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
           <div style={{ flex: 1, borderLeft: '3px solid #6264a7', paddingLeft: 8 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#6264a7' }}>回复 {replyTo.sender?.username || '用户'}</div>
-            <div style={{ fontSize: 13, color: '#616161', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {replyTo.type === 'image' ? '🖼️ 图片' : replyTo.content?.substring(0, 60)}
             </div>
           </div>
-          <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#999' }}>✕</button>
+          <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--text-secondary)' }}>✕</button>
         </div>
       )}
 
       {/* Image preview */}
       {imagePreview && (
-        <div style={{ padding: '8px 20px', borderTop: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 8, background: '#fafafa' }}>
+        <div style={{ padding: '8px 20px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-tertiary)' }}>
           <div style={{ position: 'relative' }}>
             <img src={imagePreview} alt="预览" style={{ height: 60, borderRadius: 6, objectFit: 'cover' }} />
             <button onClick={cancelImage} style={{
               position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%',
-              background: '#e53935', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12,
+              background: 'var(--danger, #e53935)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12,
               display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, padding: 0,
             }}>✕</button>
           </div>
@@ -714,15 +752,15 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
       )}
 
       {/* Input */}
-      <div style={{ padding: '12px 20px', borderTop: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
+      <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, position: 'relative', background: 'var(--bg-primary)' }}>
         {/* Mention dropdown anchored above input */}
         {mentionDropdown && (
           <div style={{
             position: 'absolute', bottom: '100%', left: 20, zIndex: 1000,
-            background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            background: 'var(--bg-card)', borderRadius: 8, boxShadow: '0 4px 16px var(--shadow)',
             padding: 0, maxHeight: 260, overflowY: 'auto', width: 280, marginBottom: 4,
           }}>
-            <div style={{ padding: '8px 12px', fontSize: 12, color: '#999', fontWeight: 600, borderBottom: '1px solid #f0f0f0' }}>建议</div>
+            <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, borderBottom: '1px solid var(--bg-hover)' }}>建议</div>
             {mentionDropdown.map((u: any, idx: number) => {
               const isGpt = u.username === 'GPT-5.4-mini';
               const isSelected = idx === mentionSelectedIdx;
@@ -730,7 +768,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                 <div key={u._id || u.id} onClick={() => selectMention(u)} style={{
                   padding: '8px 12px', cursor: 'pointer', fontSize: 14, borderRadius: 4,
                   display: 'flex', alignItems: 'center', gap: 10,
-                  background: isSelected ? '#e8ebfa' : 'transparent',
+                  background: isSelected ? 'var(--msg-sent)' : 'transparent',
                 }}
                 onMouseEnter={() => setMentionSelectedIdx(idx)}
                 >
@@ -749,7 +787,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                   )}
                   <div>
                     <div style={{ fontWeight: 500 }}>{u.username}</div>
-                    {isGpt && <div style={{ fontSize: 11, color: '#999' }}>AI 助手</div>}
+                    {isGpt && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>AI 助手</div>}
                   </div>
                 </div>
               );
@@ -757,18 +795,13 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
           </div>
         )}
         <input type="file" ref={fileInputRef} accept="*/*" style={{ display: 'none' }} onChange={handleFileSelect} />
-        <button onClick={() => fileInputRef.current?.click()} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 4 }} title="发送图片">📎</button>
+        <button onClick={() => fileInputRef.current?.click()} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', color: '#888' }} title="发送图片"><AttachIcon size={20} /></button>
         <div style={{ position: 'relative' }} ref={emojiPickerRef}>
-          <button onClick={() => setShowEmojiPicker(prev => !prev)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }} title="表情">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-              <line x1="9" y1="9" x2="9.01" y2="9"/>
-              <line x1="15" y1="9" x2="15.01" y2="9"/>
-            </svg>
+          <button onClick={() => setShowEmojiPicker(prev => !prev)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', color: '#888' }} title="表情">
+            <EmojiIcon size={20} />
           </button>
           {showEmojiPicker && (
-            <div style={{ position: 'absolute', bottom: 45, left: 0, zIndex: 1000, boxShadow: '0 4px 20px rgba(0,0,0,0.15)', borderRadius: 8, background: '#fff', padding: 12, width: 340 }}>
+            <div style={{ position: 'absolute', bottom: 45, left: 0, zIndex: 1000, boxShadow: '0 4px 20px var(--shadow)', borderRadius: 8, background: 'var(--bg-card)', padding: 12, width: 340 }}>
               {EMOJI_LIST.map((row, i) => (
                 <div key={i} style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                   {row.map(emoji => (
@@ -776,7 +809,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
                       background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4,
                       borderRadius: 4, lineHeight: 1,
                     }}
-                    onMouseOver={e => (e.currentTarget.style.background = '#f0f0f0')}
+                    onMouseOver={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                     onMouseOut={e => (e.currentTarget.style.background = 'none')}
                     >{emoji}</button>
                   ))}
@@ -813,9 +846,9 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
             }
           }}
           placeholder="输入消息..."
-          style={{ flex: 1, padding: '8px 14px', border: '1px solid #e0e0e0', borderRadius: 6, fontSize: 14, outline: 'none' }} />
+          style={{ flex: 1, padding: '8px 14px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 14, outline: 'none', background: 'var(--bg-input)', color: 'var(--text-primary)' }} />
         <button onClick={send} style={{
-          background: input.trim() ? '#6264a7' : '#d0d0d0', color: '#fff', border: 'none',
+          background: input.trim() ? '#6264a7' : 'var(--text-disabled)', color: '#fff', border: 'none',
           borderRadius: 6, padding: '8px 16px', cursor: input.trim() ? 'pointer' : 'default', fontSize: 14, fontWeight: 600,
         }}>发送</button>
       </div>
@@ -829,7 +862,7 @@ export default function ChatArea({ conversationId, currentUserId, conversation, 
           <img src={lightboxSrc} alt="大图" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 8 }} onClick={e => e.stopPropagation()} />
           <button onClick={() => setLightboxSrc(null)} style={{
             position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.9)', border: 'none',
-            borderRadius: '50%', width: 36, height: 36, fontSize: 20, cursor: 'pointer', fontWeight: 600,
+            borderRadius: '50%', width: 36, height: 36, fontSize: 20, cursor: 'pointer', fontWeight: 600, color: '#1a1a1a',
           }}>✕</button>
         </div>
       )}

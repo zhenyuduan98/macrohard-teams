@@ -19,6 +19,14 @@ const lightVars: Record<string, string> = {
   '--bg-hover': '#f0f0f0',
   '--bg-input': '#e8e8e8',
   '--bg-card': '#fff',
+  '--bg-tertiary': '#fafafa',
+  '--text-disabled': '#bdbdbd',
+  '--danger': '#c4314b',
+  '--success': '#4caf50',
+  '--warning': '#ff9800',
+  '--primary': '#6264a7',
+  '--msg-bot': '#f3e8ff',
+  '--msg-bot-border': '#7c4dff',
   '--shadow': 'rgba(0,0,0,0.15)',
 };
 
@@ -34,6 +42,14 @@ const darkVars: Record<string, string> = {
   '--bg-hover': '#3a3a3a',
   '--bg-input': '#3a3a3a',
   '--bg-card': '#2d2d2d',
+  '--bg-tertiary': '#252525',
+  '--text-disabled': '#666666',
+  '--danger': '#c4314b',
+  '--success': '#4caf50',
+  '--warning': '#ff9800',
+  '--primary': '#6264a7',
+  '--msg-bot': '#2d1b4e',
+  '--msg-bot-border': '#7c4dff',
   '--shadow': 'rgba(0,0,0,0.4)',
 };
 

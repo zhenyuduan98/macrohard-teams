@@ -5,7 +5,7 @@ import { Message } from './models/Message.js';
 import { Conversation } from './models/Conversation.js';
 import { Activity } from './models/Activity.js';
 import { CallLog } from './models/CallLog.js';
-import { getBotUserId, getGptBotUserId, processBotCommand, isGptConversation, handleGptMessage } from './bot.js';
+import { getBotUserId, getGptBotUserId, getOpusBotUserId, processBotCommand, isGptConversation, handleGptMessage, isOpusConversation, handleOpusMessage } from './bot.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'teamchat-dev-secret';
 const onlineUsers = new Map<string, string>();
@@ -30,6 +30,9 @@ export function setupSocket(io: Server) {
     onlineUsers.set(userId, socket.id);
     await User.findByIdAndUpdate(userId, { status: 'online' }).catch(() => {});
     io.emit('user_online', { userId });
+
+    // Send current online users list to the newly connected client
+    socket.emit('online_users', Array.from(onlineUsers.keys()));
 
     try {
       const convos = await Conversation.find({ participants: userId });
@@ -168,6 +171,34 @@ export function setupSocket(io: Server) {
             setTimeout(() => handleGptMessage(data.conversationId, io), 500);
           } else if (data.content?.includes('@GPT-5.4-mini')) {
             setTimeout(() => handleGptMessage(data.conversationId, io, true), 500);
+          }
+        }
+
+        // Opus 4.6 bot response
+        const opusId = getOpusBotUserId();
+        if (opusId && userId !== opusId) {
+          const isOpus = await isOpusConversation(data.conversationId);
+          if (isOpus) {
+            if (data.content?.trim() === '/newsession') {
+              // Send a confirmation message from Opus bot
+              setTimeout(async () => {
+                try {
+                  const confirmMsg = await Message.create({
+                    sender: opusId,
+                    conversation: data.conversationId,
+                    content: '🔄 **新会话已创建！** 之前的对话上下文已清除，我们从头开始吧~',
+                    type: 'text',
+                  });
+                  await Conversation.findByIdAndUpdate(data.conversationId, { lastMessage: confirmMsg._id, updatedAt: new Date() });
+                  const populated = await confirmMsg.populate('sender', '-password');
+                  io.to(data.conversationId).emit('receive_message', populated);
+                } catch {}
+              }, 300);
+            } else {
+              setTimeout(() => handleOpusMessage(data.conversationId, io), 500);
+            }
+          } else if (data.content?.includes('@Opus 4.6')) {
+            setTimeout(() => handleOpusMessage(data.conversationId, io, true), 500);
           }
         }
       } catch (err) {

@@ -29,6 +29,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     const s = io(SOCKET_URL, { auth: { token } });
     socketRef.current = s;
 
+    s.on('online_users', (userIds: string[]) => {
+      setOnlineUsers(new Set(userIds));
+    });
+
     s.on('user_online', ({ userId }: { userId: string }) => {
       setOnlineUsers(prev => new Set(prev).add(userId));
     });
