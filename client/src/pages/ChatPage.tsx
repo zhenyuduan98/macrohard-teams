@@ -31,6 +31,7 @@ export default function ChatPage() {
   const [activeView, setActiveView] = useState('chat');
   const [showTeamCreate, setShowTeamCreate] = useState(false);
   const [channelConvoId, setChannelConvoId] = useState('');
+  const [teamListKey, setTeamListKey] = useState(0);
   const [channelHeader, setChannelHeader] = useState({ name: '', teamName: '' });
   const [hasUnreadActivity, setHasUnreadActivity] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -173,6 +174,7 @@ export default function ChatPage() {
         <>
           {(!isMobile || mobileView === 'list') && (
             <TeamList
+              key={teamListKey}
               onSelectChannel={(channelId, channelName, teamName) => {
                 setChannelConvoId(channelId);
                 setChannelHeader({ name: channelName, teamName });
@@ -233,7 +235,7 @@ export default function ChatPage() {
       {showTeamCreate && (
         <TeamCreateDialog
           onClose={() => setShowTeamCreate(false)}
-          onCreate={() => {}}
+          onCreate={() => setTeamListKey(k => k + 1)}
         />
       )}
       {showProfile && <ProfilePanel onClose={() => setShowProfile(false)} />}
