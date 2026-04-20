@@ -127,3 +127,24 @@ export async function deleteChannel(teamId: string, channelId: string) {
   const r = await axios.delete(`${API}/teams/${teamId}/channels/${channelId}`, { headers: headers() });
   return r.data;
 }
+
+// Channel message APIs
+export async function fetchChannelMessages(channelId: string, before?: string) {
+  const params: any = { limit: 50 };
+  if (before) params.before = before;
+  const r = await axios.get(`${API}/teams/channels/${channelId}/messages`, { headers: headers(), params });
+  return r.data;
+}
+
+export async function sendChannelMessage(channelId: string, content: string, type?: string, fileInfo?: any, replyTo?: string) {
+  const body: any = { content, type: type || 'text' };
+  if (fileInfo) body.fileInfo = fileInfo;
+  if (replyTo) body.replyTo = replyTo;
+  const r = await axios.post(`${API}/teams/channels/${channelId}/messages`, body, { headers: headers() });
+  return r.data;
+}
+
+export async function fetchChannelMembers(channelId: string) {
+  const r = await axios.get(`${API}/teams/channels/${channelId}/members`, { headers: headers() });
+  return r.data;
+}

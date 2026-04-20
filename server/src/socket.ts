@@ -2,7 +2,10 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { User } from './models/User.js';
 import { Message } from './models/Message.js';
+import { ChannelMessage } from './models/ChannelMessage.js';
 import { Conversation } from './models/Conversation.js';
+import { Channel } from './models/Channel.js';
+import { Team } from './models/Team.js';
 import { Activity } from './models/Activity.js';
 import { CallLog } from './models/CallLog.js';
 import { getBotUserId, getGptBotUserId, getOpusBotUserId, processBotCommand, isGptConversation, handleGptMessage, isOpusConversation, handleOpusMessage } from './bot.js';
@@ -377,6 +380,129 @@ export function setupSocket(io: Server) {
           await log.save();
         }
       } catch {}
+    });
+
+    // ========================
+    // 频道聊天 Socket 事件
+    // ========================
+
+    // Join channel room
+    socket.on('join_channel', (data: { channelId: string }) => {
+      socket.join(`channel:${data.channelId}`);
+    });
+
+    // Leave channel room
+    socket.on('leave_channel', (data: { channelId: string }) => {
+      socket.leave(`channel:${data.channelId}`);
+    });
+
+    // Send channel message
+    socket.on('send_channel_message', async (data: { channelId: string; content: string; type?: string; replyTo?: string; fileInfo?: { filename: string; size: number; mimeType: string } }, ack?: Function) => {
+      try {
+        const channel = await Channel.findById(data.channelId);
+        if (!channel) { if (ack) ack({ success: false, error: '频道不存在' }); return; }
+
+        const team = await Team.findById(channel.team).populate('members', '-password');
+        if (!team || !team.members.some((m: any) => (m._id || m).toString() === userId)) {
+          if (ack) ack({ success: false, error: '无权发送' }); return;
+        }
+
+        const msgData: any = {
+          sender: userId,
+          channel: data.channelId,
+          content: data.content,
+          type: data.type || 'text',
+        };
+        if (data.replyTo) msgData.replyTo = data.replyTo;
+        if (data.fileInfo) msgData.fileInfo = data.fileInfo;
+
+        // Parse @mentions
+        const mentionPattern = /@(\S+)/g;
+        let match;
+        const mentionedUsernames: string[] = [];
+        while ((match = mentionPattern.exec(data.content)) !== null) {
+          mentionedUsernames.push(match[1]);
+        }
+        const members = team.members as any[];
+        const mentionedIds: string[] = [];
+        const isAllMention = mentionedUsernames.includes('所有人');
+        if (isAllMention) {
+          members.forEach((m: any) => { const mid = (m._id || m).toString(); if (mid !== userId) mentionedIds.push(mid); });
+        } else {
+          for (const uname of mentionedUsernames) {
+            const found = members.find((m: any) => m.username === uname);
+            if (found) { const fid = ((found as any)._id || found).toString(); if (fid !== userId) mentionedIds.push(fid); }
+          }
+        }
+        msgData.mentions = mentionedIds;
+
+        const message = await ChannelMessage.create(msgData);
+        let populated = await message.populate('sender', '-password');
+        if (data.replyTo) {
+          populated = await populated.populate({ path: 'replyTo', populate: { path: 'sender', select: '-password' } });
+        }
+
+        io.to(`channel:${data.channelId}`).emit('receive_channel_message', populated);
+
+        // Activity for mentions
+        const senderUser = await User.findById(userId).select('username').lean();
+        for (const mentionedId of mentionedIds) {
+          try {
+            await Activity.create({
+              type: 'mention',
+              user: mentionedId,
+              actor: userId,
+              message: message._id,
+              description: `${(senderUser as any)?.username || '某人'} 在频道 #${channel.name} 中提到了你`,
+            });
+            const mentionedSocketId = onlineUsers.get(mentionedId);
+            if (mentionedSocketId) {
+              io.to(mentionedSocketId).emit('mentioned', { message: populated, conversationName: `#${channel.name}` });
+              io.to(mentionedSocketId).emit('new_activity');
+            }
+          } catch {}
+        }
+
+        if (ack) ack({ success: true, message: populated });
+      } catch {
+        if (ack) ack({ success: false, error: '发送失败' });
+      }
+    });
+
+    // Edit channel message
+    socket.on('edit_channel_message', async (data: { messageId: string; content: string }, ack?: Function) => {
+      try {
+        const msg = await ChannelMessage.findById(data.messageId);
+        if (!msg || msg.sender.toString() !== userId) { if (ack) ack({ success: false, error: '无权编辑' }); return; }
+        if (msg.isDeleted) { if (ack) ack({ success: false, error: '消息已撤回' }); return; }
+        const fiveMin = 5 * 60 * 1000;
+        if (Date.now() - msg.timestamp.getTime() > fiveMin) { if (ack) ack({ success: false, error: '超过编辑时限' }); return; }
+
+        msg.content = data.content;
+        msg.editedAt = new Date();
+        await msg.save();
+        const populated = await msg.populate('sender', '-password');
+        io.to(`channel:${msg.channel.toString()}`).emit('channel_message_edited', populated);
+        if (ack) ack({ success: true, message: populated });
+      } catch { if (ack) ack({ success: false, error: '编辑失败' }); }
+    });
+
+    // Delete channel message
+    socket.on('delete_channel_message', async (data: { messageId: string }, ack?: Function) => {
+      try {
+        const msg = await ChannelMessage.findById(data.messageId);
+        if (!msg || msg.sender.toString() !== userId) { if (ack) ack({ success: false, error: '无权撤回' }); return; }
+        msg.isDeleted = true;
+        msg.content = '';
+        await msg.save();
+        io.to(`channel:${msg.channel.toString()}`).emit('channel_message_deleted', { messageId: msg._id, channelId: msg.channel.toString() });
+        if (ack) ack({ success: true });
+      } catch { if (ack) ack({ success: false, error: '撤回失败' }); }
+    });
+
+    // Typing in channel
+    socket.on('channel_typing', (data: { channelId: string }) => {
+      socket.to(`channel:${data.channelId}`).emit('channel_user_typing', { userId, channelId: data.channelId });
     });
 
     socket.on('disconnect', async () => {

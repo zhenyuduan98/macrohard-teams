@@ -1,6 +1,9 @@
 import { Router, Response } from 'express';
 import { Team } from '../models/Team.js';
 import { Channel } from '../models/Channel.js';
+import { ChannelMessage } from '../models/ChannelMessage.js';
+import { User } from '../models/User.js';
+import { Activity } from '../models/Activity.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -161,6 +164,123 @@ router.delete('/:id/channels/:channelId', authMiddleware, async (req: AuthReques
     res.json({ success: true });
   } catch {
     res.status(500).json({ error: '删除频道失败' });
+  }
+});
+
+// ========================
+// 频道消息 API
+// ========================
+
+// GET /api/teams/channels/:channelId/messages — 获取频道消息（分页）
+router.get('/channels/:channelId/messages', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { channelId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const before = req.query.before as string; // cursor: timestamp or message id
+
+    const channel = await Channel.findById(channelId);
+    if (!channel) return res.status(404).json({ error: '频道不存在' });
+
+    // Verify user is team member
+    const team = await Team.findById(channel.team);
+    if (!team || !team.members.some(m => m.toString() === req.userId)) {
+      return res.status(403).json({ error: '无权访问该频道' });
+    }
+
+    const query: any = { channel: channelId };
+    if (before) {
+      query.timestamp = { $lt: new Date(before) };
+    }
+
+    const messages = await ChannelMessage.find(query)
+      .sort({ timestamp: -1 })
+      .limit(limit)
+      .populate('sender', '-password')
+      .populate({ path: 'replyTo', populate: { path: 'sender', select: '-password' } });
+
+    res.json(messages.reverse());
+  } catch {
+    res.status(500).json({ error: '获取频道消息失败' });
+  }
+});
+
+// POST /api/teams/channels/:channelId/messages — 发送频道消息
+router.post('/channels/:channelId/messages', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { channelId } = req.params;
+    const { content, type, replyTo, fileInfo } = req.body;
+
+    if (!content) return res.status(400).json({ error: '消息内容不能为空' });
+
+    const channel = await Channel.findById(channelId);
+    if (!channel) return res.status(404).json({ error: '频道不存在' });
+
+    const team = await Team.findById(channel.team).populate('members', '-password');
+    if (!team || !team.members.some((m: any) => (m._id || m).toString() === req.userId)) {
+      return res.status(403).json({ error: '无权在该频道发消息' });
+    }
+
+    const msgData: any = {
+      sender: req.userId,
+      channel: channelId,
+      content,
+      type: type || 'text',
+    };
+    if (replyTo) msgData.replyTo = replyTo;
+    if (fileInfo) msgData.fileInfo = fileInfo;
+
+    // Parse @mentions
+    const mentionPattern = /@(\S+)/g;
+    let match;
+    const mentionedUsernames: string[] = [];
+    while ((match = mentionPattern.exec(content)) !== null) {
+      mentionedUsernames.push(match[1]);
+    }
+
+    const members = team.members as any[];
+    const mentionedIds: string[] = [];
+    const isAllMention = mentionedUsernames.includes('所有人');
+
+    if (isAllMention) {
+      members.forEach((m: any) => {
+        const mid = (m._id || m).toString();
+        if (mid !== req.userId) mentionedIds.push(mid);
+      });
+    } else {
+      for (const uname of mentionedUsernames) {
+        const found = members.find((m: any) => m.username === uname);
+        if (found) {
+          const fid = ((found as any)._id || found).toString();
+          if (fid !== req.userId) mentionedIds.push(fid);
+        }
+      }
+    }
+
+    msgData.mentions = mentionedIds;
+    const message = await ChannelMessage.create(msgData);
+
+    let populated = await message.populate('sender', '-password');
+    if (replyTo) {
+      populated = await populated.populate({ path: 'replyTo', populate: { path: 'sender', select: '-password' } });
+    }
+
+    // Create activity for mentions
+    const senderUser = await User.findById(req.userId).select('username').lean();
+    for (const mentionedId of mentionedIds) {
+      try {
+        await Activity.create({
+          type: 'mention',
+          user: mentionedId,
+          actor: req.userId,
+          message: message._id,
+          description: `${(senderUser as any)?.username || '某人'} 在频道 #${channel.name} 中提到了你`,
+        });
+      } catch {}
+    }
+
+    res.status(201).json(populated);
+  } catch {
+    res.status(500).json({ error: '发送频道消息失败' });
   }
 });
 

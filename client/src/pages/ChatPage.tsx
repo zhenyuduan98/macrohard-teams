@@ -10,6 +10,7 @@ import GroupCreateDialog from '../components/GroupCreateDialog';
 import ProfilePanel from '../components/ProfilePanel';
 import TeamList from '../components/TeamList';
 import TeamCreateDialog from '../components/TeamCreateDialog';
+import ChannelChat from '../components/ChannelChat';
 import ActivityFeed from '../components/ActivityFeed';
 import CalendarView from '../components/CalendarView';
 import CallHistory from '../components/CallHistory';
@@ -183,10 +184,10 @@ export default function ChatPage() {
             />
           )}
           {(!isMobile || mobileView === 'chat') && (
-            <ChatArea
-              conversationId={channelConvoId}
-              currentUserId={user?.id || ''}
-              conversation={{ isGroup: true, name: channelHeader.name ? `${channelHeader.teamName} > #${channelHeader.name}` : '' }}
+            <ChannelChat
+              channelId={channelConvoId}
+              channelName={channelHeader.name}
+              teamName={channelHeader.teamName}
               onStartChat={handleStartChat}
               isMobile={isMobile}
               onMobileBack={handleMobileBack}
