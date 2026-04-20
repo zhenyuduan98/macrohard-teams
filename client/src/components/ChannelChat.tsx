@@ -106,11 +106,11 @@ export default function ChannelChat({ channelId, channelName, teamName, onStartC
     const deleteHandler = (data: { messageId: string }) => {
       setMessages(prev => prev.map(m => m._id === data.messageId ? { ...m, isDeleted: true, content: '' } : m));
     };
-    socket.on('channel_message', handler);
+    socket.on('receive_channel_message', handler);
     socket.on('channel_message_edited', editHandler);
     socket.on('channel_message_deleted', deleteHandler);
     return () => {
-      socket.off('channel_message', handler);
+      socket.off('receive_channel_message', handler);
       socket.off('channel_message_edited', editHandler);
       socket.off('channel_message_deleted', deleteHandler);
     };
@@ -126,8 +126,8 @@ export default function ChannelChat({ channelId, channelName, teamName, onStartC
         typingTimer.current = setTimeout(() => setTypingUser(''), 2000);
       }
     };
-    socket.on('channel_typing', handler);
-    return () => { socket.off('channel_typing', handler); };
+    socket.on('channel_user_typing', handler);
+    return () => { socket.off('channel_user_typing', handler); };
   }, [socket, channelId, currentUserId]);
 
   useEffect(() => {
