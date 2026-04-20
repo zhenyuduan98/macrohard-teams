@@ -176,7 +176,6 @@ export default function ChatPage() {
               onSelectChannel={(channelId, channelName, teamName) => {
                 setChannelConvoId(channelId);
                 setChannelHeader({ name: channelName, teamName });
-                socket?.emit('join_conversation', { conversationId: channelId });
                 if (isMobile) setMobileView('chat');
               }}
               onCreateTeam={() => setShowTeamCreate(true)}

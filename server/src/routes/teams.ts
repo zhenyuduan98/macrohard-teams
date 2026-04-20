@@ -284,4 +284,17 @@ router.post('/channels/:channelId/messages', authMiddleware, async (req: AuthReq
   }
 });
 
+// GET /api/teams/channels/:channelId/members — 获取频道所属团队的成员
+router.get('/channels/:channelId/members', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const channel = await Channel.findById(req.params.channelId);
+    if (!channel) return res.status(404).json({ error: '频道不存在' });
+    const team = await Team.findById(channel.team).populate('members', '-password');
+    if (!team) return res.status(404).json({ error: '团队不存在' });
+    res.json(team.members);
+  } catch {
+    res.status(500).json({ error: '获取成员失败' });
+  }
+});
+
 export default router;
