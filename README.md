@@ -1,6 +1,9 @@
 # MacroHard Teams 💬
 
 > A full-featured real-time chat application inspired by Microsoft Teams, built with modern web technologies.
+<img width="2337" height="1503" alt="image" src="https://github.com/user-attachments/assets/a06c83b5-1c62-41df-8fa2-aad5ad91f7d6" />
+<img width="2388" height="1352" alt="image" src="https://github.com/user-attachments/assets/5fe39f83-8c72-48d3-b055-243ca0ddaa12" />
+<img width="2388" height="1352" alt="image" src="https://github.com/user-attachments/assets/920ecbb3-e723-42f3-88e1-779b3fc6dd5e" />
 
 🌐 **Live Demo:** [https://teams.chillicurry.uk](https://teams.chillicurry.uk)
 
