@@ -5,7 +5,6 @@ import { ContactVisibility } from '../models/ContactVisibility.js';
 import { Message } from '../models/Message.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { getGptBotUserId } from '../bot.js';
-import { ContactVisibility } from '../models/ContactVisibility.js';
 
 const router = Router();
 
